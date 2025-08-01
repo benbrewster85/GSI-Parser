@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GSI Level Parser Tool</title>
+    <title>GSI Level Parser</title>
     <style>
         :root {
             --bg: #0f0f0f;
@@ -302,6 +302,38 @@
             color: var(--text-dim);
             margin-bottom: 15px;
         }
+
+        /* Control Points Table - REMOVED */
+        .control-points-container {
+            display: none;
+        }
+
+        .control-point-row {
+            display: none;
+        }
+
+        .control-point-input {
+            display: none;
+        }
+
+        .control-point-select {
+            display: none;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+        }
+
+        .residual-flag {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .residual-ok {
+            color: var(--accent);
+        }
     </style>
 </head>
 <body>
@@ -390,6 +422,42 @@
                         <button class="btn primary" id="applyAdvanced" style="margin-top: 10px;">Apply & Reprocess</button>
                     </div>
                 </div>
+
+
+
+                <!-- Adjustment Options - REMOVED FOR NOW -->
+                <!--
+                <div style="grid-column: 1 / -1; margin-top: 20px;">
+                    <h4 style="margin-bottom: 15px; color: var(--text);">⚖️ Adjustment Method</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <label class="checkbox-label">
+                                <input type="radio" name="adjustmentMethod" value="none" checked style="width: 16px; height: 16px;">
+                                <span>No Adjustment</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="adjustmentMethod" value="equal" style="width: 16px; height: 16px;">
+                                <span>Equal Distribution</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="adjustmentMethod" value="proportional" style="width: 16px; height: 16px;">
+                                <span>Distance Weighted</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="adjustmentMethod" value="constrained" style="width: 16px; height: 16px;">
+                                <span>Control Constrained</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="form-label">Benchmark Tolerance (m):</label>
+                            <input type="number" id="benchmarkTolerance" value="0.020" step="0.001" class="form-input" style="margin-bottom: 10px;">
+                            
+                            <label class="form-label">Flag Large Residuals (m):</label>
+                            <input type="number" id="residualThreshold" value="0.015" step="0.001" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                -->
             </div>
         </div>
 
@@ -421,6 +489,11 @@
                 <button class="btn" id="copyBtn">📋 Copy</button>
             </div>
         </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px;">
+            Created by Ben Brewster 2025
+        </div>
     </div>
 
     <script>
@@ -436,7 +509,10 @@
                     aggregateCP: true,
                     changePointPrefix: 'CP',
                     includeTurnCount: false,
-                    showCPDetails: false
+                    showCPDetails: false,
+                    adjustmentMethod: 'none',
+                    benchmarkTolerance: 0.020,
+                    residualThreshold: 0.015
                 };
             }
 
@@ -472,6 +548,8 @@
                 this.aggregatedRuns = this.aggregateChangePointRuns();
                 return result;
             }
+
+
 
             parseLine(line) {
                 const words = line.split(/\s+/);
@@ -808,8 +886,13 @@
                 this.data.forEach(record => {
                     const point = record.words['11'] ? record.words['11'].value : '';
                     const distance = record.words['32'] ? record.words['32'].value.toFixed(3) : '';
-                    const height = record.words['83'] ? record.words['83'].value.toFixed(4) : '';
+                    let height = '';
                     const setup = record.setupNumber || '';
+                    
+                    // Use adjusted elevation if available
+                    if (record.words['83']) {
+                        height = record.words['83'].value.toFixed(4);
+                    }
                     
                     let reading = '';
                     if (record.words['330']) reading = record.words['330'].value.toFixed(5);
@@ -1048,6 +1131,13 @@
         const includeTurnCount = document.getElementById('includeTurnCount');
         const showCPDetails = document.getElementById('showCPDetails');
 
+        // Control points elements - REMOVED
+        // const controlPointsTable = document.getElementById('controlPointsTable');
+        // const addControlPoint = document.getElementById('addControlPoint');
+        // const detectControlPoints = document.getElementById('detectControlPoints');
+        // const importControlBtn = document.getElementById('importControlBtn');
+        // const importControlCSV = document.getElementById('importControlCSV');
+
         console.log('Advanced section elements check:');
         console.log('advancedSection found:', !!advancedSection);
         console.log('advancedBtn found:', !!advancedBtn);
@@ -1106,6 +1196,7 @@
             advancedBtn.textContent = '⚙️ Advanced';
         });
 
+        // FIXED - Complete applyAdvanced event listener
         applyAdvanced.addEventListener('click', function() {
             console.log('Apply advanced clicked');
             
@@ -1143,6 +1234,9 @@
                 showStatus('✗ Error reprocessing: ' + error.message, 'error');
             }
         });
+
+
+
 
         function processFile(file) {
             const reader = new FileReader();
@@ -1240,6 +1334,9 @@
                 }, 2000);
             });
         });
+
+        // Initialize empty app state
+        console.log('GSI Parser initialized and ready.');
     </script>
 </body>
 </html>
