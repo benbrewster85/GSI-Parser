@@ -218,6 +218,12 @@
             color: #ff4444;
         }
 
+        .status.warning {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid #ffa500;
+            color: #ffa500;
+        }
+
         .hidden {
             display: none;
         }
@@ -404,8 +410,38 @@
                             Groups readings between named stations through change points
                         </p>
                         
-                        <label class="form-label">Change Point Prefix:</label>
-                        <input type="text" id="changePointPrefix" value="CP" placeholder="e.g., CP, TP, TBM" class="form-input">
+                        <label class="form-label">Change Point Detection Method:</label>
+                        <div style="margin-bottom: 15px;">
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="prefix" checked style="width: 16px; height: 16px;">
+                                <span>Text Prefix (e.g., CP, TP, TBM)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="numeric" style="width: 16px; height: 16px;">
+                                <span>Numeric Only (1, 2, 3, 4...)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="both" style="width: 16px; height: 16px;">
+                                <span>Both Methods</span>
+                            </label>
+                        </div>
+                        
+                        <div id="prefixSettings">
+                            <label class="form-label">Change Point Prefix:</label>
+                            <input type="text" id="changePointPrefix" value="CP" placeholder="e.g., CP, TP, TBM" class="form-input">
+                        </div>
+                        
+                        <div id="numericSettings" style="display: none;">
+                            <label class="form-label">Numeric Range:</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" id="numericMin" value="1" min="0" max="999" class="form-input" style="width: 80px;" placeholder="Min">
+                                <span>to</span>
+                                <input type="number" id="numericMax" value="999" min="1" max="9999" class="form-input" style="width: 80px;" placeholder="Max">
+                            </div>
+                            <p class="help-text">
+                                Point names that are purely numeric within this range will be treated as change points
+                            </p>
+                        </div>
                     </div>
                     
                     <div class="advanced-group">
@@ -422,42 +458,6 @@
                         <button class="btn primary" id="applyAdvanced" style="margin-top: 10px;">Apply & Reprocess</button>
                     </div>
                 </div>
-
-
-
-                <!-- Adjustment Options - REMOVED FOR NOW -->
-                <!--
-                <div style="grid-column: 1 / -1; margin-top: 20px;">
-                    <h4 style="margin-bottom: 15px; color: var(--text);">⚖️ Adjustment Method</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div>
-                            <label class="checkbox-label">
-                                <input type="radio" name="adjustmentMethod" value="none" checked style="width: 16px; height: 16px;">
-                                <span>No Adjustment</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="radio" name="adjustmentMethod" value="equal" style="width: 16px; height: 16px;">
-                                <span>Equal Distribution</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="radio" name="adjustmentMethod" value="proportional" style="width: 16px; height: 16px;">
-                                <span>Distance Weighted</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="radio" name="adjustmentMethod" value="constrained" style="width: 16px; height: 16px;">
-                                <span>Control Constrained</span>
-                            </label>
-                        </div>
-                        <div>
-                            <label class="form-label">Benchmark Tolerance (m):</label>
-                            <input type="number" id="benchmarkTolerance" value="0.020" step="0.001" class="form-input" style="margin-bottom: 10px;">
-                            
-                            <label class="form-label">Flag Large Residuals (m):</label>
-                            <input type="number" id="residualThreshold" value="0.015" step="0.001" class="form-input">
-                        </div>
-                    </div>
-                </div>
-                -->
             </div>
         </div>
 
@@ -497,8 +497,7 @@
     </div>
 
     <script>
-        // Test if JavaScript is running
-        console.log('GSI Parser JavaScript is loading...');
+    
 
         class GSIParser {
             constructor() {
@@ -508,6 +507,9 @@
                 this.processingOptions = {
                     aggregateCP: true,
                     changePointPrefix: 'CP',
+                    changePointMethod: 'prefix', // 'prefix', 'numeric', 'both'
+                    numericMin: 1,
+                    numericMax: 999,
                     includeTurnCount: false,
                     showCPDetails: false,
                     adjustmentMethod: 'none',
@@ -517,23 +519,287 @@
             }
 
             parse(text) {
-                this.rawData = text; // Store raw data for reprocessing
+                // Security check: Input size
+                if (text.length > MAX_FILE_SIZE) {
+                    throw new Error('Input text too large');
+                }
+
+                this.rawData = text;
                 this.data = [];
                 const lines = text.split('\n');
                 
+                // Security check: Line count
+                if (lines.length > MAX_RECORDS) {
+                    throw new Error(`Too many lines. Maximum ${MAX_RECORDS} lines allowed.`);
+                }
+
+                // GSI Format Validation and Detection
+                const formatAnalysis = this.analyzeGSIFormat(lines);
+                this.displayFormatWarnings(formatAnalysis);
+                
+                let processedRecords = 0;
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
+                    
+                    // Security check: Line length
+                    if (line.length > MAX_LINE_LENGTH) {
+                        console.warn(`Skipping excessively long line ${i + 1}`);
+                        continue;
+                    }
+                    
+                    // Security check: Record limit
+                    if (processedRecords >= MAX_RECORDS) {
+                        console.warn(`Reached maximum record limit of ${MAX_RECORDS}`);
+                        break;
+                    }
                     
                     const record = this.parseLine(line);
                     if (record) {
                         record.lineNumber = i + 1;
                         this.data.push(record);
+                        processedRecords++;
                     }
                 }
                 
                 this.calculateStats();
                 return this.data;
+            }
+
+            analyzeGSIFormat(lines) {
+                const analysis = {
+                    totalLines: lines.length,
+                    validGSILines: 0,
+                    invalidLines: [],
+                    formatType: 'unknown',
+                    isTPS: false,
+                    hasLevelingData: false,
+                    hasCoordinateData: false,
+                    wordCounts: {},
+                    errors: [],
+                    warnings: []
+                };
+
+                let sampleValidLines = 0;
+                const maxSampleSize = Math.min(50, lines.length); // Analyze first 50 lines for efficiency
+
+                for (let i = 0; i < maxSampleSize; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const lineAnalysis = this.analyzeGSILine(line, i + 1);
+                    
+                    if (lineAnalysis.isValid) {
+                        analysis.validGSILines++;
+                        sampleValidLines++;
+                        
+                        // Collect word IDs for pattern analysis
+                        lineAnalysis.wordIds.forEach(wi => {
+                            analysis.wordCounts[wi] = (analysis.wordCounts[wi] || 0) + 1;
+                        });
+                        
+                        // Check for specific data types
+                        if (lineAnalysis.hasLevelingWords) analysis.hasLevelingData = true;
+                        if (lineAnalysis.hasCoordinateWords) analysis.hasCoordinateData = true;
+                        
+                    } else {
+                        analysis.invalidLines.push({
+                            lineNumber: i + 1,
+                            content: line.substring(0, 100) + (line.length > 100 ? '...' : ''),
+                            issues: lineAnalysis.issues
+                        });
+                    }
+                }
+
+                // Determine format type and TPS detection
+                this.determineGSIFormat(analysis);
+                
+                return analysis;
+            }
+
+            analyzeGSILine(line, lineNumber) {
+                const result = {
+                    isValid: false,
+                    wordIds: [],
+                    hasLevelingWords: false,
+                    hasCoordinateWords: false,
+                    issues: []
+                };
+
+                // Check basic GSI structure
+                const words = line.split(/\s+/);
+                
+                if (words.length === 0) {
+                    result.issues.push('Empty line');
+                    return result;
+                }
+
+                let validWords = 0;
+                const levelingWIs = ['331', '332', '333', '330', '83', '84', '85'];
+                const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
+                const tpsSpecificWIs = ['16', '17', '18', '19', '71', '72', '73', '74', '75', '76'];
+
+                for (const word of words) {
+                    if (word.length < 8) {
+                        result.issues.push(`Word too short: ${word}`);
+                        continue;
+                    }
+
+                    // Check GSI word structure
+                    let wi, isValidStructure = false;
+                    
+                    if (word.startsWith('*')) {
+                        // GSI-16 format
+                        wi = word.substring(1, 3);
+                        isValidStructure = /^\*\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
+                    } else {
+                        // GSI-8 format variations
+                        if (/^\d{3}\./.test(word)) {
+                            // 3-digit WI (like 331.28+...)
+                            wi = word.substring(0, 3);
+                            isValidStructure = /^\d{3}\.[\d\.]{2}[+\-]\d+$/.test(word);
+                        } else {
+                            // 2-digit WI (like 11+...)
+                            wi = word.substring(0, 2);
+                            isValidStructure = /^\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
+                        }
+                    }
+
+                    if (isValidStructure && !isNaN(parseInt(wi))) {
+                        validWords++;
+                        result.wordIds.push(wi);
+                        
+                        if (levelingWIs.includes(wi)) result.hasLevelingWords = true;
+                        if (coordinateWIs.includes(wi)) result.hasCoordinateWords = true;
+                    } else {
+                        result.issues.push(`Invalid GSI word structure: ${word.substring(0, 20)}`);
+                    }
+                }
+
+                // A line is valid if it has at least one valid GSI word
+                result.isValid = validWords > 0;
+                
+                return result;
+            }
+
+            determineGSIFormat(analysis) {
+                // Detect TPS files
+                const tpsIndicators = ['16', '17', '18', '19', '58', '59', '71', '72', '73', '74', '75', '76'];
+                const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
+                const levelingWIs = ['331', '332', '333', '330'];
+
+                const hasTpsWords = tpsIndicators.some(wi => analysis.wordCounts[wi] > 0);
+                const hasCoordinates = coordinateWIs.some(wi => analysis.wordCounts[wi] > 0);
+                const hasLeveling = levelingWIs.some(wi => analysis.wordCounts[wi] > 0);
+
+                // TPS Detection Logic
+                if (hasTpsWords || (hasCoordinates && !hasLeveling)) {
+                    analysis.isTPS = true;
+                    analysis.formatType = 'TPS';
+                    analysis.warnings.push('⚠️ TPS (Total Station) GSI detected - This parser is optimized for leveling data');
+                } else if (hasLeveling) {
+                    analysis.formatType = 'Leveling';
+                } else if (hasCoordinates) {
+                    analysis.formatType = 'Coordinate';
+                    analysis.warnings.push('⚠️ Coordinate data detected - Limited support for non-leveling GSI');
+                }
+
+                // Format validation
+                const validLineRatio = analysis.validGSILines / Math.max(1, analysis.totalLines - this.countEmptyLines(analysis));
+                
+                if (validLineRatio < 0.7) {
+                    analysis.errors.push(`❌ Poor GSI format: Only ${Math.round(validLineRatio * 100)}% of lines are valid GSI format`);
+                }
+
+                if (analysis.validGSILines === 0) {
+                    analysis.errors.push('❌ No valid GSI data found - Check file format');
+                }
+
+                // Specific format warnings
+                if (analysis.wordCounts['11'] === 0) {
+                    analysis.warnings.push('⚠️ No point IDs (WI 11) found');
+                }
+
+                if (Object.keys(analysis.wordCounts).length < 3) {
+                    analysis.warnings.push('⚠️ Very limited GSI word types detected');
+                }
+            }
+
+            countEmptyLines(analysis) {
+                return analysis.totalLines - analysis.validGSILines - analysis.invalidLines.length;
+            }
+
+            displayFormatWarnings(analysis) {
+                const messages = [];
+
+                // Add format detection message
+                if (analysis.formatType !== 'unknown') {
+                    messages.push(`📋 GSI Format: ${analysis.formatType}`);
+                }
+
+                // Add TPS warning
+                if (analysis.isTPS) {
+                    messages.push('🔶 TPS GSI Detected: This file appears to contain Total Station data. This parser is specialized for leveling data and may not display all TPS features correctly.');
+                }
+
+                // Add errors
+                analysis.errors.forEach(error => messages.push(error));
+                
+                // Add warnings
+                analysis.warnings.forEach(warning => messages.push(warning));
+
+                // Add validation summary
+                if (analysis.invalidLines.length > 0) {
+                //   messages.push(`⚠️ ${analysis.invalidLines.length} lines have formatting issues`);
+                    
+                    // Show first few invalid lines as examples
+                    const exampleCount = Math.min(3, analysis.invalidLines.length);
+                    for (let i = 0; i < exampleCount; i++) {
+                        const invalid = analysis.invalidLines[i];
+                        //messages.push(`   Line ${invalid.lineNumber}: ${invalid.content}`);
+                    }
+                    
+                    if (analysis.invalidLines.length > exampleCount) {
+                        messages.push(`   ... and ${analysis.invalidLines.length - exampleCount} more`);
+                    }
+                }
+
+                // Display all messages
+                if (messages.length > 0) {
+                    const messageText = messages.join('\n');
+                    
+                    // Determine message type based on content
+                    let messageType = 'success';
+                    if (analysis.errors.length > 0) {
+                        messageType = 'error';
+                    } else if (analysis.warnings.length > 0 || analysis.isTPS) {
+                        messageType = 'warning';
+                    }
+                    
+                    // Use a custom status display for format analysis
+                    this.showFormatStatus(messageText, messageType);
+                }
+            }
+
+            showFormatStatus(message, type) {
+                // Create or update format status element
+                let formatStatus = document.getElementById('formatStatus');
+                if (!formatStatus) {
+                    formatStatus = document.createElement('div');
+                    formatStatus.id = 'formatStatus';
+                    formatStatus.className = 'status';
+                    
+                    // Insert after the main status element
+                    const mainStatus = document.getElementById('status');
+                    mainStatus.parentNode.insertBefore(formatStatus, mainStatus.nextSibling);
+                }
+                
+                formatStatus.textContent = message;
+                formatStatus.className = 'status ' + type;
+                formatStatus.classList.remove('hidden');
+                formatStatus.style.whiteSpace = 'pre-line'; // Allow line breaks
+                formatStatus.style.marginTop = '10px';
+                formatStatus.style.fontSize = '13px';
             }
 
             reprocess() {
@@ -548,8 +814,6 @@
                 this.aggregatedRuns = this.aggregateChangePointRuns();
                 return result;
             }
-
-
 
             parseLine(line) {
                 const words = line.split(/\s+/);
@@ -570,9 +834,11 @@
                 
                 return Object.keys(record.words).length > 0 ? record : null;
             }
-
+// removed some security checks - review this later if needed 
             parseWord(word) {
-                if (word.length < 8) return null;
+                if (word.length < 8 || word.length > 100) return null; // Increased max length for longer point names
+                
+              
                 
                 let wi, info, sign, data;
                 
@@ -584,20 +850,16 @@
                     data = word.substring(8);
                 } else {
                     // Check if it's a 3-digit WI (like 331, 332, 333)
-                    // These have the pattern: digit-digit-digit-dot
                     const first3 = word.substring(0, 3);
                     const fourth = word.substring(3, 4);
                     
                     if (!isNaN(first3) && fourth === '.' && first3.length === 3 && 
                         parseInt(first3) >= 330 && parseInt(first3) <= 399) {
-                        // 3-digit WI like 331.28+... (staff readings)
                         wi = first3;
                         info = word.substring(3, 6);
                         sign = word.substring(6, 7);
                         data = word.substring(7);
                     } else {
-                        // 2-digit WI like 32...8+... or 11+...
-                        // Extract just the first 2 digits as WI, ignore any dots in info
                         wi = word.substring(0, 2);
                         info = word.substring(2, 6);
                         sign = word.substring(6, 7);
@@ -605,17 +867,37 @@
                     }
                 }
                 
+                // Security: Validate WI is numeric (but be more lenient)
+                if (wi && isNaN(parseInt(wi))) {
+                    console.warn('Non-numeric WI detected:', wi, 'in word:', word.substring(0, 20));
+                    return null;
+                }
+                
                 const value = this.interpretValue(wi, sign + data, info);
                 return { wi, info, sign, data, value };
             }
 
             interpretValue(wi, valueStr, info) {
+                // Handle point names (WI 11) - preserve as text
                 if (wi === '11') {
-                    return valueStr.replace(/^[+\-0]*/, '').replace(/^0+/, '') || valueStr;
+                    // Clean up the value string but preserve alphanumeric characters
+                    let cleaned = valueStr.replace(/^[+\-0]*/, ''); // Remove leading +/- and zeros
+                    cleaned = cleaned.replace(/^0+/, '') || valueStr; // Remove leading zeros but keep something
+                    
+                    // If it's still empty or just symbols, return the original
+                    if (!cleaned || cleaned.length === 0) {
+                        cleaned = valueStr;
+                    }
+                    
+                    return cleaned;
                 }
                 
+                // Handle numeric values
                 const num = parseInt(valueStr);
-                if (isNaN(num)) return 0;
+                if (isNaN(num)) {
+                    console.warn('Non-numeric value for WI', wi, ':', valueStr);
+                    return 0;
+                }
                 
                 // Use position 6 for scale factor
                 const pos6 = info.charAt(info.length - 1);
@@ -670,8 +952,10 @@
                     if (code.includes('1')) this.stats.method = 'BF';
                     else if (code.includes('2')) this.stats.method = 'BFFB';
                     else this.stats.method = 'Unknown';
+                    console.log('Detected method:', this.stats.method, 'from code:', code);
                 } else {
                     this.stats.method = '—';
+                    console.log('No method code found');
                 }
             }
 
@@ -713,6 +997,39 @@
                 return runs;
             }
 
+            isChangePoint(pointId) {
+                if (!pointId) return false;
+                
+                const method = this.processingOptions.changePointMethod;
+                const prefix = this.processingOptions.changePointPrefix.toUpperCase();
+                const upperPointId = pointId.toUpperCase();
+                
+                switch (method) {
+                    case 'prefix':
+                        return upperPointId.startsWith(prefix);
+                        
+                    case 'numeric':
+                        // Check if point ID is purely numeric and within range
+                        if (!/^\d+$/.test(pointId)) return false;
+                        const num = parseInt(pointId);
+                        return num >= this.processingOptions.numericMin && 
+                               num <= this.processingOptions.numericMax;
+                        
+                    case 'both':
+                        // Check prefix method first
+                        if (upperPointId.startsWith(prefix)) return true;
+                        
+                        // Then check numeric method
+                        if (!/^\d+$/.test(pointId)) return false;
+                        const numBoth = parseInt(pointId);
+                        return numBoth >= this.processingOptions.numericMin && 
+                               numBoth <= this.processingOptions.numericMax;
+                        
+                    default:
+                        return false;
+                }
+            }
+
             aggregateChangePointRuns() {
                 if (!this.processingOptions.aggregateCP) {
                     return this.levelRuns;
@@ -721,9 +1038,15 @@
                 const aggregatedRuns = [];
                 const prefix = this.processingOptions.changePointPrefix.toUpperCase();
                 
+                // Security: Prevent infinite loops with maximum iterations
+                const maxIterations = this.levelRuns.length * 2;
+                let iterations = 0;
+                
                 // Group consecutive runs that form a change point sequence
                 let i = 0;
-                while (i < this.levelRuns.length) {
+                while (i < this.levelRuns.length && iterations < maxIterations) {
+                    iterations++;
+                    
                     const currentRun = this.levelRuns[i];
                     
                     // Check if this starts a change point sequence
@@ -745,7 +1068,8 @@
                     let sequenceRuns = [currentRun];
                     let j = i + 1;
                     
-                    while (j < this.levelRuns.length) {
+                    while (j < this.levelRuns.length && iterations < maxIterations) {
+                        iterations++;
                         const nextRun = this.levelRuns[j];
                         const nextBsPoint = nextRun.backsight.words['11'] ? nextRun.backsight.words['11'].value.toUpperCase() : '';
                         
@@ -812,6 +1136,10 @@
                     i = j;
                 }
 
+                if (iterations >= maxIterations) {
+                    console.warn('Aggregation loop safety limit reached');
+                }
+
                 return aggregatedRuns;
             }
 
@@ -875,7 +1203,16 @@
                 
                 // Add processing options info
                 if (this.processingOptions.aggregateCP) {
-                    report += 'Change Point Processing: Enabled (Prefix: ' + this.processingOptions.changePointPrefix + ')\n';
+                    let cpInfo = 'Change Point Processing: Enabled (';
+                    if (this.processingOptions.changePointMethod === 'prefix') {
+                        cpInfo += 'Prefix: ' + this.processingOptions.changePointPrefix;
+                    } else if (this.processingOptions.changePointMethod === 'numeric') {
+                        cpInfo += 'Numeric: ' + this.processingOptions.numericMin + '-' + this.processingOptions.numericMax;
+                    } else {
+                        cpInfo += 'Both: ' + this.processingOptions.changePointPrefix + ' and ' + this.processingOptions.numericMin + '-' + this.processingOptions.numericMax;
+                    }
+                    cpInfo += ')\n';
+                    report += cpInfo;
                 }
                 
                 report += '\n';
@@ -975,12 +1312,13 @@
                 
                 // Units and settings
                 output += '.UNITS METERS\n';
-                output += '.HORIZONTAL OBSERVATIONS\n\n';
+                output += '#.SEPARATOR /\n\n';
                 
-                // Find first point with height as benchmark
+                // Find first point with height as benchmark (commented out by default)
                 const firstPoint = this.data.find(r => r.words['11'] && r.words['83']);
                 if (firstPoint) {
-                    output += 'F ' + firstPoint.words['11'].value + ' ' + firstPoint.words['83'].value.toFixed(4) + '\n\n';
+                    output += '# Fixed elevation - uncomment if needed:\n';
+                    output += '#E ' + firstPoint.words['11'].value + ' ' + firstPoint.words['83'].value.toFixed(4) + '\n\n';
                 }
                 
                 // Process level runs to create proper leveling observations
@@ -1034,8 +1372,8 @@
                             const isHeight = is.words['83'] ? is.words['83'].value : null;
                             
                             if (isPoint && isHeight !== null) {
-                                output += '# Intermediate sight\n';
-                                output += 'H ' + isPoint + ' ' + isHeight.toFixed(4) + '\n';
+                                output += '# Intermediate sight - uncomment if needed:\n';
+                                output += '#E ' + isPoint + ' ' + isHeight.toFixed(4) + '\n';
                             }
                         });
                         
@@ -1131,17 +1469,12 @@
         const includeTurnCount = document.getElementById('includeTurnCount');
         const showCPDetails = document.getElementById('showCPDetails');
 
-        // Control points elements - REMOVED
-        // const controlPointsTable = document.getElementById('controlPointsTable');
-        // const addControlPoint = document.getElementById('addControlPoint');
-        // const detectControlPoints = document.getElementById('detectControlPoints');
-        // const importControlBtn = document.getElementById('importControlBtn');
-        // const importControlCSV = document.getElementById('importControlCSV');
+        // Change point method elements
+        const prefixSettings = document.getElementById('prefixSettings');
+        const numericSettings = document.getElementById('numericSettings');
+        const numericMin = document.getElementById('numericMin');
+        const numericMax = document.getElementById('numericMax');
 
-        console.log('Advanced section elements check:');
-        console.log('advancedSection found:', !!advancedSection);
-        console.log('advancedBtn found:', !!advancedBtn);
-        console.log('applyAdvanced found:', !!applyAdvanced);
 
         // Theme toggle
         themeBtn.addEventListener('click', function() {
@@ -1185,30 +1518,56 @@
 
         // Advanced options event listeners
         advancedBtn.addEventListener('click', function() {
-            console.log('Advanced button clicked');
             advancedSection.classList.toggle('hidden');
             advancedBtn.textContent = advancedSection.classList.contains('hidden') ? '⚙️ Advanced' : '⚙️ Hide Advanced';
         });
 
         advancedToggle.addEventListener('click', function() {
-            console.log('Advanced toggle clicked');
             advancedSection.classList.add('hidden');
             advancedBtn.textContent = '⚙️ Advanced';
         });
 
+        // Change point method toggle handlers
+        document.querySelectorAll('input[name="changePointMethod"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                toggleChangePointSettings(this.value);
+            });
+        });
+
+        function toggleChangePointSettings(method) {
+            switch (method) {
+                case 'prefix':
+                    prefixSettings.style.display = 'block';
+                    numericSettings.style.display = 'none';
+                    break;
+                case 'numeric':
+                    prefixSettings.style.display = 'none';
+                    numericSettings.style.display = 'block';
+                    break;
+                case 'both':
+                    prefixSettings.style.display = 'block';
+                    numericSettings.style.display = 'block';
+                    break;
+            }
+        }
+
         // FIXED - Complete applyAdvanced event listener
         applyAdvanced.addEventListener('click', function() {
-            console.log('Apply advanced clicked');
+            
+            // Get change point method settings
+            const changePointMethod = document.querySelector('input[name="changePointMethod"]:checked').value;
             
             // Update processing options
             const newOptions = {
                 aggregateCP: aggregateCP.checked,
                 changePointPrefix: changePointPrefix.value || 'CP',
+                changePointMethod: changePointMethod,
+                numericMin: parseInt(numericMin.value) || 1,
+                numericMax: parseInt(numericMax.value) || 999,
                 includeTurnCount: includeTurnCount.checked,
                 showCPDetails: showCPDetails.checked
             };
             
-            console.log('New options:', newOptions);
             
             try {
                 parser.updateProcessingOptions(newOptions);
@@ -1235,21 +1594,58 @@
             }
         });
 
-
-
+        // Security constants
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+        const MAX_RECORDS = 500000; // Increased for larger surveys
+        const MAX_LINE_LENGTH = 1000; // Reduced but still reasonable for GSI lines
+        const PROCESSING_TIMEOUT = 60000; // Increased to 60 seconds
 
         function processFile(file) {
+            // Security check: File size
+            if (file.size > MAX_FILE_SIZE) {
+                showStatus('✗ File too large. Maximum size is 50MB.', 'error');
+                return;
+            }
+
+            // Security check: File type
+            const allowedExtensions = ['.gsi', '.txt', '.dat', '.raw'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            if (!allowedExtensions.includes(fileExtension)) {
+                showStatus('✗ Invalid file type. Only GSI, TXT, DAT, and RAW files are allowed.', 'error');
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    parser.parse(e.target.result);
+                    // Set processing timeout
+                    const timeoutId = setTimeout(() => {
+                        throw new Error('File processing timeout - file may be malformed');
+                    }, PROCESSING_TIMEOUT);
+
+                    const result = parser.parse(e.target.result);
+                    clearTimeout(timeoutId);
+                    
                     showStatus('✓ Parsed ' + parser.data.length + ' records', 'success');
                     updateUI();
                 } catch (error) {
-                    showStatus('✗ Error: ' + error.message, 'error');
+                    showStatus('✗ Error: ' + escapeHtml(error.message), 'error');
+                    console.error('Parsing error:', error);
                 }
             };
+            
+            reader.onerror = function() {
+                showStatus('✗ Error reading file', 'error');
+            };
+            
             reader.readAsText(file);
+        }
+
+        // HTML escaping function to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function showStatus(message, type) {
@@ -1265,13 +1661,13 @@
             methodType.textContent = parser.stats.method;
             heightRange.textContent = parser.stats.heightRange;
 
-            // Update table
+            // Update table with XSS protection
             dataTable.innerHTML = '';
             parser.data.slice(0, 20).forEach(function(record) {
                 if (record.type === 'method_code') return; // Skip method codes
                 
                 const row = document.createElement('tr');
-                const point = record.words['11'] ? record.words['11'].value : '';
+                const point = record.words['11'] ? escapeHtml(record.words['11'].value) : '';
                 const distance = record.words['32'] ? record.words['32'].value.toFixed(3) : '';
                 const height = record.words['83'] ? record.words['83'].value.toFixed(4) : '';
                 
@@ -1281,12 +1677,34 @@
                 else if (record.words['332']) reading = record.words['332'].value.toFixed(5);
                 else if (record.words['333']) reading = record.words['333'].value.toFixed(5);
                 
-                row.innerHTML = '<td>' + point + '</td>' +
-                    '<td><span class="type-badge type-' + record.type + '">' + record.type + '</span></td>' +
-                    '<td>' + reading + '</td>' +
-                    '<td>' + distance + '</td>' +
-                    '<td>' + height + '</td>' +
-                    '<td>' + (record.setupNumber || '') + '</td>';
+                // Use textContent instead of innerHTML to prevent XSS
+                const pointCell = document.createElement('td');
+                pointCell.textContent = record.words['11'] ? record.words['11'].value : '';
+                
+                const typeCell = document.createElement('td');
+                const typeBadge = document.createElement('span');
+                typeBadge.className = 'type-badge type-' + record.type;
+                typeBadge.textContent = record.type;
+                typeCell.appendChild(typeBadge);
+                
+                const readingCell = document.createElement('td');
+                readingCell.textContent = reading;
+                
+                const distanceCell = document.createElement('td');
+                distanceCell.textContent = distance;
+                
+                const heightCell = document.createElement('td');
+                heightCell.textContent = height;
+                
+                const setupCell = document.createElement('td');
+                setupCell.textContent = record.setupNumber || '';
+                
+                row.appendChild(pointCell);
+                row.appendChild(typeCell);
+                row.appendChild(readingCell);
+                row.appendChild(distanceCell);
+                row.appendChild(heightCell);
+                row.appendChild(setupCell);
                 
                 dataTable.appendChild(row);
             });
@@ -1335,8 +1753,6 @@
             });
         });
 
-        // Initialize empty app state
-        console.log('GSI Parser initialized and ready.');
     </script>
 </body>
 </html>
