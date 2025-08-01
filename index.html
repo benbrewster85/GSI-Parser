@@ -739,7 +739,7 @@
 
                 // Add TPS warning
                 if (analysis.isTPS) {
-                    messages.push('🔶 TPS GSI Detected: This file appears to contain Total Station data. This parser is specialized for leveling data and may not display all TPS features correctly.');
+                    messages.push('🔶 TPS GSI Detected: This file appears to contain Total Station data. This parser is specialized for leveling data and may not display all TPS features correctly. We are working on it!');
                 }
 
                 // Add errors
@@ -952,10 +952,8 @@
                     if (code.includes('1')) this.stats.method = 'BF';
                     else if (code.includes('2')) this.stats.method = 'BFFB';
                     else this.stats.method = 'Unknown';
-                    console.log('Detected method:', this.stats.method, 'from code:', code);
                 } else {
                     this.stats.method = '—';
-                    console.log('No method code found');
                 }
             }
 
