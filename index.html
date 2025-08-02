@@ -716,7 +716,7 @@
             }
             
             processAndAnalyze() {
-                // Phase 1: Detect calibration data using the full, original dataset
+                // Phase 1: Detect calibration data using the full dataset
                 const allRuns = this.buildLevelRuns(this.fullData);
                 this.calibrationInfo = this.identifyCalibrationData(allRuns);
 
@@ -724,7 +724,7 @@
 
                 // Phase 2: Decide whether to filter based on detection and options
                 if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
-                    // We have a calibration and the user wants to separate it
+                    // Case 1: Calibration found and EXCLUDED.
                     this.displayCalibrationWarning(this.calibrationInfo);
 
                     const endLineMatch = this.calibrationInfo.recordRange.match(/to\s(\d+)/);
@@ -749,19 +749,20 @@
                         }
                     }
                 } else {
-                     // No calibration, or user wants to keep it. Use full dataset.
-                    if (this.calibrationInfo.isCalibration) {
+                     // Case 2: No calibration, OR calibration found but RETAINED.
+                    if (this.calibrationInfo.isCalibration) { // This means retainCalibrationData is true
                          this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
-                    } else {
-                        // Clear any previous format warnings if no new ones are generated
+                    } else { // No calibration found
                          document.getElementById('formatStatus').classList.add('hidden');
                     }
+                    // In both sub-cases, the full dataset is processed, so show a generic success message.
+                    showStatus(`✓ Parsed ${this.fullData.length} records successfully.`, 'success');
                 }
 
                 // Phase 3: Process the final selected dataset (either full or main)
                 this.calculateStatsForCurrentData();
             }
-
+            
             calculateStatsForCurrentData() {
                 const points = new Set();
                 const heights = [];
