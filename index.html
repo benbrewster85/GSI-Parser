@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GSI Level Parser</title>
+    <title>GSI Parser</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <style>
         :root {
             --bg: #0f0f0f;
@@ -153,13 +156,13 @@
             background: var(--accent);
             color: var(--bg);
         }
-        
+
         .btn.status-action {
             padding: 6px 12px;
             font-size: 12px;
             margin-right: 8px;
         }
-
+        
         .btn.primary {
             background: var(--accent);
             color: var(--bg);
@@ -250,7 +253,7 @@
             border: 1px solid #ffa500;
             color: #ffa500;
         }
-        
+
         .status.info {
             background: rgba(0, 123, 255, 0.1);
             border: 1px solid #007bff;
@@ -291,6 +294,11 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 25px;
+        }
+        
+        #aboutSection .advanced-content p, 
+        #aboutSection .advanced-content li {
+            font-size: 14px;
         }
 
         .advanced-grid {
@@ -381,6 +389,53 @@
             </div>
         </div>
 
+        <div class="section hidden" id="aboutSection">
+            <div class="section-title">
+                ℹ️ About GSI.PARSER
+                <button class="btn" id="aboutToggle">Hide</button>
+            </div>
+            
+            <div class="advanced-content">
+                <div class="advanced-grid">
+                    <div class="advanced-group">
+                        <h4>Features</h4>
+                        <ul>
+                            <li>Parse GSI format levelling data with intelligent format detection.</li>
+                            <li>Automatically detect and separate two-peg calibration tests.</li>
+                            <li>Aggregate change point readings for cleaner analysis.</li>
+                            <li>Export to multiple formats: Reports, StarNet, CSV.</li>
+                        </ul>
+
+                        <br><h4>Supported Formats</h4>
+                        <ul>
+                            <li><strong>.gsi</strong> - Standard GSI format files</li>
+                            <li><strong>.txt</strong> - Text-based GSI data</li>
+                           
+                        </ul>
+                    </div>
+                    
+                    <div class="advanced-group">
+                        <h4>How to Use</h4>
+                        <ol>
+                            <li>Upload your GSI file using drag & drop or file selection.</li>
+                            <li>Review the parsed data in the preview table.</li>
+                            <li>Configure advanced options if needed (change points, output preferences).</li>
+                            <li>Export your data in the desired format.</li>
+                        </ol>
+
+                        <br><h4>Notes</h4>
+                        <p style="margin: 0;">This parser is optimised for levelling data and supports both GSI-8 and GSI-16 formats. Processing of TPS and other forms of .GSI data are in development...<br> <br>This app is provided free to use. Please consider a donation to help us keep it that way - link at the bottom of the page.</p>
+
+                        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+                            <strong>Version:</strong> 2025.1 • <strong>Created by:</strong> B Brewster
+                            <br>
+                            <strong>Contact:</strong> admin@surveytools.co.uk
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <div class="upload-area" id="uploadArea" role="button" tabindex="0">
                 <div style="font-size: 36px; margin-bottom: 10px;">📁</div>
@@ -392,54 +447,6 @@
             </div>
             <div id="status" class="status hidden" role="alert"></div>
             <div id="formatStatus" class="status hidden" role="status"></div>
-        </div>
-
-        <div class="section hidden" id="aboutSection">
-            <div class="section-title">
-                ℹ️ About GSI.PARSER
-                <button class="btn" id="aboutToggle">Hide</button>
-            </div>
-            
-            <div class="advanced-content">
-                <div class="advanced-grid">
-                    <div class="advanced-group">
-                        <h4>🎯 Features</h4>
-                        <ul style="margin: 0; padding-left: 20px;">
-                            <li>Parse GSI format levelling data with intelligent format detection</li>
-                            <li>Aggregate change point readings for cleaner analysis</li>
-                            <li>Export to multiple formats: Reports, StarNet, CSV</li>
-                            <li>Advanced processing options for different survey methods <i>coming soon!</i></li>
-                            <li>Real-time data validation and error reporting <i>coming soon!</i></li>
-                            <br>
-                        </ul>
-
-                        <h4>📁 Supported Formats</h4>
-                        <ul style="margin: 0; padding-left: 20px;">
-                            <li><strong>.gsi</strong> - Standard GSI format files</li>
-                            <li><strong>.txt</strong> - Text-based GSI data</li>
-                           
-                        </ul>
-                    </div>
-                    
-                    <div class="advanced-group">
-                        <h4>⚙️ How to Use</h4>
-                        <ol style="margin: 0; padding-left: 20px;">
-                            <li>Upload your GSI file using drag & drop or file selection</li>
-                            <li>Review the parsed data in the preview table</li>
-                            <li>Configure advanced options if needed (change points, output preferences)</li>
-                            <li>Export your data in the desired format</li>
-                            <br>
-                        </ol>
-
-                        <h4>🔧 Technical Notes</h4>
-                        <p style="margin: 0;">This parser is optimised for levelling data and supports both GSI-8 and GSI-16 formats. Processing of TPS and other forms of .GSI data are in development..</p>
-
-                        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
-                            <strong>Version:</strong> 2025.1 • <strong>Created by:</strong> B Brewster
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="section hidden" id="statsSection">
@@ -534,7 +541,7 @@
                             <input type="checkbox" id="showCPDetails">
                             <span>Show change point details</span>
                         </label>
-                         <label class="checkbox-label" style="margin-top: 15px;">
+                        <label class="checkbox-label" style="margin-top: 15px;">
                             <input type="checkbox" id="retainCalibration">
                             <span>Retain calibration data in main survey</span>
                         </label>
@@ -551,13 +558,13 @@
             </div>
         </div>
 
-       <div class="section hidden" id="previewSection">
-    <div class="data-table">
-        <div class="table-header">
-            Data Preview
-            <button class="btn" id="toggleViewBtn" style="float: right; padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
-        </div>
-        <div style="max-height: 400px; overflow-y: auto;">
+        <div class="section hidden" id="previewSection">
+            <div class="data-table">
+                <div class="table-header">
+                    Data Preview
+                    <button class="btn" id="toggleViewBtn" style="float: right; padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
+                </div>
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -584,7 +591,7 @@
         </div>
 
         <div style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px;">
-            Created by B Brewster 2025
+            Created by B Brewster • 2025
         </div>
     </div>
 
@@ -650,7 +657,7 @@
 
             parse(text) {
                 if (text.length > MAX_FILE_SIZE) {
-                    throw new Error('Input text too large');
+                    throw new Error('File too large. Maximum size is 50MB.');
                 }
 
                 this.rawData = text;
@@ -663,6 +670,20 @@
                 
                 // Perform a preliminary format check on the raw lines
                 const formatAnalysis = this.analyzeGSIFormat(lines);
+
+                // --- VALIDATION GATE ---
+                // Check for fatal errors first. If found, throw an error to be caught by the caller.
+                if (formatAnalysis.errors.length > 0) {
+                    throw new Error(formatAnalysis.errors.join('\n'));
+                }
+
+                // Check if it's TPS data and throw a specific, user-friendly error.
+                if (formatAnalysis.isTPS) {
+                    throw new Error('This appears to be a Total Station (TPS) GSI file. This tool is designed for levelling data only. Support for TPS data is in development.');
+                }
+                // --- END VALIDATION GATE ---
+                
+                // If the file is valid and not TPS, display any other non-fatal warnings
                 this.displayFormatWarnings(formatAnalysis);
                 
                 let processedRecords = 0;
@@ -691,11 +712,11 @@
                 this.fullData = [...this.data]; // Keep a copy of the full dataset
                 this.processAndAnalyze(); // Separate calibration data and calculate stats
                 
-                return this.data; // Return the main survey data
+                return this.data;
             }
             
             processAndAnalyze() {
-                // Phase 1: Detect calibration data using the full dataset
+                // Phase 1: Detect calibration data using the full, original dataset
                 const allRuns = this.buildLevelRuns(this.fullData);
                 this.calibrationInfo = this.identifyCalibrationData(allRuns);
 
@@ -1029,7 +1050,7 @@
                 if (['390', '391', '392'].includes(wi)) return num;
                 return num / scale;
             }
-
+            
             detectMethod() {
                 // 1. Check for the explicit method code in the full, original dataset first. This is the most reliable source.
                 const methodRecord = this.fullData.find(r => r.words['41'] && r.words['41'].data.includes('?'));
@@ -1319,6 +1340,10 @@
                 let i = 0;
                 while (i < runsToProcess.length) {
                     const currentRun = runsToProcess[i];
+                    if (!currentRun.backsight || !currentRun.foresights) {
+                        i++;
+                        continue;
+                    }
                     const bsPoint = currentRun.backsight.words['11']?.value || '';
                     const isStartOfSequence = !this.isChangePoint(bsPoint) && 
                         currentRun.foresights.some(fs => this.isChangePoint(fs.words['11']?.value || ''));
@@ -1333,6 +1358,7 @@
                     let j = i + 1;
                     while (j < runsToProcess.length) {
                         const nextRun = runsToProcess[j];
+                        if (!nextRun || !nextRun.backsight) break;
                         const nextBsPoint = nextRun.backsight.words['11']?.value || '';
                         if (this.isChangePoint(nextBsPoint)) {
                             sequenceRuns.push(nextRun);
@@ -1473,7 +1499,7 @@
                 const firstPoint = this.data.find(r => r.words['11'] && r.words['83']);
                 if (firstPoint) {
                     output += '# Fixed elevation - uncomment if needed:\n';
-                    output += `#E ${firstPoint.words['11'].value} ${firstPoint.words['83'].value.toFixed(4)}\n\n`;
+                    output += `#E ${firstPoint.words['11'].value} ${firstPoint.words['83'].value.toFixed(4)} ! \n\n`;
                 }
                 
                 const runsToProcess = this.processingOptions.aggregateCP ? this.aggregatedRuns : this.levelRuns;
@@ -1616,7 +1642,7 @@
             elements.starnetBtn.addEventListener('click', () => {
                 setActiveExportButton('starnetBtn');
                 currentExtension = 'dat';
-                showOutput(parser.exportStarNet(), 'StarNet DAT');
+                showOutput(parser.exportStarNet(), 'StarNet');
             });
             elements.csvBtn.addEventListener('click', () => {
                 setActiveExportButton('csvBtn');
@@ -1744,6 +1770,7 @@
             const reader = new FileReader();
             reader.onload = e => {
                 const timeoutId = setTimeout(() => {
+                    resetUI();
                     showStatus('✗ Processing timed out. The file might be too large or malformed.', 'error');
                 }, PROCESSING_TIMEOUT);
 
@@ -1751,25 +1778,28 @@
                     parser = new GSIParser();
                     parser.parse(e.target.result);
                     
-                    if (parser.data.length === 0 && !parser.calibrationInfo.isCalibration) {
-                         showStatus('✗ No valid survey data found to process.', 'error');
-                         resetUI();
-                    } else {
-                        updateUI();
-                        elements.reportBtn.click(); // Auto-generate and show the report
+                    // This block will now only be reached if parsing is successful
+                    if (parser.data.length === 0 && parser.calibrationInfo.isCalibration) {
+                         // This case happens if the file ONLY contained a calibration test
+                         updateUI();
+                         return; 
                     }
+                    
+                    updateUI();
+                    elements.reportBtn.click(); // Auto-generate and show the report
+                    
                 } catch (error) {
-                    showStatus(`✗ Error: ${escapeHtml(error.message)}`, 'error');
+                    resetUI(); // 1. Reset the UI elements first
+                    showStatus(`✗ ${escapeHtml(error.message)}`, 'error'); // 2. Then show the error message
                     console.error('Parsing error:', error);
-                    resetUI();
                 } finally {
                     clearTimeout(timeoutId);
                 }
             };
             
             reader.onerror = () => {
-                showStatus('✗ Error reading file.', 'error');
                 resetUI();
+                showStatus('✗ Error reading file.', 'error');
             };
             
             reader.readAsText(file);
@@ -1853,8 +1883,9 @@
             if (!parser || !parser.calibrationInfo.isCalibration) return;
             
             const endLineMatch = parser.calibrationInfo.recordRange.match(/to\s(\d+)/);
-            const startLineMatch = parser.calibrationInfo.recordRange.match(/from\s(\d+)|Records\s(\d+)/i);
-            const startLine = startLineMatch ? parseInt(startLineMatch[1] || startLineMatch[2]) : 1;
+            // Updated regex to handle both "Records X to Y" and "Lines X to Y"
+            const startLineMatch = parser.calibrationInfo.recordRange.match(/(?:Records|Lines)\s(\d+)/i);
+            const startLine = startLineMatch ? parseInt(startLineMatch[1]) : 1;
 
             if (endLineMatch) {
                 const endLine = parseInt(endLineMatch[1]);
