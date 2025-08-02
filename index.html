@@ -1031,14 +1031,41 @@
             }
 
             detectMethod() {
-                const methodRecord = this.data.find(r => r.words['41'] && r.words['41'].data.includes('?'));
+                // 1. Check for the explicit method code in the full, original dataset first. This is the most reliable source.
+                const methodRecord = this.fullData.find(r => r.words['41'] && r.words['41'].data.includes('?'));
                 if (methodRecord) {
                     const code = methodRecord.words['41'].data;
                     if (code.includes('1')) return 'BF';
-                    else if (code.includes('2')) return 'BFFB';
-                    else return 'Unknown';
+                    if (code.includes('2')) return 'BFFB';
+                    return 'Unknown'; // Code found but not recognized
                 }
-                return '—';
+
+                // 2. If no code is found, infer from the structure of the main level runs.
+                if (!this.levelRuns || this.levelRuns.length === 0) {
+                    return '—'; // Not enough data to make a determination
+                }
+
+                // Get an array of foresight counts for each setup that has at least one foresight.
+                const foresightCounts = this.levelRuns
+                    .map(run => run.foresights.length)
+                    .filter(count => count > 0);
+                
+                if (foresightCounts.length === 0) {
+                    return '—'; // No complete setups found in the main run
+                }
+
+                // Check for consistent patterns
+                const allAreBF = foresightCounts.every(count => count === 1);
+                if (allAreBF) {
+                    return 'BF (Inferred)';
+                }
+
+                const allAreBFFB = foresightCounts.every(count => count === 2);
+                if (allAreBFFB) {
+                    return 'BFFB (Inferred)';
+                }
+
+                return 'Mixed/Unknown'; // If patterns are inconsistent, we can't be sure
             }
 
             identifyCalibrationData(runsForDetection) {
