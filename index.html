@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GSI Parser</title>
-    <link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <title>GSI Level Parser</title>
     <style>
         :root {
             --bg: #0f0f0f;
@@ -156,7 +153,7 @@
             background: var(--accent);
             color: var(--bg);
         }
-
+        
         .btn.status-action {
             padding: 6px 12px;
             font-size: 12px;
@@ -186,11 +183,19 @@
             margin-bottom: 30px;
         }
 
+        numeric {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+}
+
         .table-header {
             background: var(--surface-light);
             padding: 15px 20px;
             font-weight: bold;
             border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         table {
@@ -253,7 +258,7 @@
             border: 1px solid #ffa500;
             color: #ffa500;
         }
-
+        
         .status.info {
             background: rgba(0, 123, 255, 0.1);
             border: 1px solid #007bff;
@@ -278,6 +283,13 @@
         .type-backsight { background: rgba(0, 255, 136, 0.2); color: var(--accent); }
         .type-foresight { background: rgba(255, 165, 0, 0.2); color: #ffa500; }
         .type-intermediate { background: rgba(0, 123, 255, 0.2); color: #007bff; }
+        .type-starting_height { 
+            background: rgba(167, 139, 250, 0.2); 
+            color: #a78bfa; }
+        .type-result { 
+            background: rgba(236, 72, 153, 0.2); 
+            color: #ec4899; 
+        }
 
         .section-title {
             display: flex;
@@ -376,7 +388,42 @@
             .btn {
                 width: 100%;
             }
+
+            /* Fixes the "About" section on mobile */
+            #aboutSection .advanced-content {
+                padding: 20px 15px; /* Reduces side padding */
+            }
+            
+            #aboutSection .advanced-content ol,
+            #aboutSection .advanced-content ul {
+                padding-left: 25px; /* Reduces list indentation */
+            }
+
+            .table-container table {
+                min-width: 700px; /* Forces table to a minimum width, enabling horizontal scroll */
+            }
         }
+        #aboutSection .advanced-content p, 
+#aboutSection .advanced-content li {
+    font-size: 14px;
+}
+
+/* This makes the table header sticky */
+.data-table th {
+    position: sticky;
+    top: 0; /* Stick to the top of the scrollable container */
+    z-index: 1; /* Ensure it stays above the table rows */
+}
+
+/* This creates the blue text style for the calculated RL */
+.calculated-rl {
+    color: #64b5f6; /* A clear blue for dark mode */
+    font-weight: 500;
+}
+
+[data-theme="light"] .calculated-rl {
+    color: #0056b3; /* A darker blue for light mode */
+}
     </style>
 </head>
 <body>
@@ -404,9 +451,9 @@
                             <li>Automatically detect and separate two-peg calibration tests.</li>
                             <li>Aggregate change point readings for cleaner analysis.</li>
                             <li>Export to multiple formats: Reports, StarNet, CSV.</li>
-                        </ul>
+                        </ul><br>
 
-                        <br><h4>Supported Formats</h4>
+                        <h4>Supported Formats</h4>
                         <ul>
                             <li><strong>.gsi</strong> - Standard GSI format files</li>
                             <li><strong>.txt</strong> - Text-based GSI data</li>
@@ -421,10 +468,10 @@
                             <li>Review the parsed data in the preview table.</li>
                             <li>Configure advanced options if needed (change points, output preferences).</li>
                             <li>Export your data in the desired format.</li>
-                        </ol>
+                        </ol><br>
 
-                        <br><h4>Notes</h4>
-                        <p style="margin: 0;">This parser is optimised for levelling data and supports both GSI-8 and GSI-16 formats. Processing of TPS and other forms of .GSI data are in development...<br> <br>This app is provided free to use. Please consider a donation to help us keep it that way - link at the bottom of the page.</p>
+                        <h4>Technical Notes</h4>
+                        <p style="margin: 0;">This parser is optimised for levelling data and supports both GSI-8 and GSI-16 formats. Processing of TPS and other forms of GSI and survey data are in development.</p><br><p> This application is provided free of charge, please donate using the link at the bottom of the screen to help me keep it that way.</p>
 
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
                             <strong>Version:</strong> 2025.1 • <strong>Created by:</strong> B Brewster
@@ -541,7 +588,7 @@
                             <input type="checkbox" id="showCPDetails">
                             <span>Show change point details</span>
                         </label>
-                        <label class="checkbox-label" style="margin-top: 15px;">
+                         <label class="checkbox-label" style="margin-top: 15px;">
                             <input type="checkbox" id="retainCalibration">
                             <span>Retain calibration data in main survey</span>
                         </label>
@@ -562,7 +609,7 @@
             <div class="data-table">
                 <div class="table-header">
                     Data Preview
-                    <button class="btn" id="toggleViewBtn" style="float: right; padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
+                    <button class="btn" id="toggleViewBtn" style="padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
                 </div>
                 <div style="max-height: 400px; overflow-y: auto;">
                     <table>
@@ -573,10 +620,33 @@
                                 <th>Reading</th>
                                 <th>Distance</th>
                                 <th>Height</th>
+                                <th>Calculated RL</th>
                                 <th>Setup</th>
                             </tr>
                         </thead>
                         <tbody id="dataTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="analysisSection">
+            <div class="data-table">
+                <div class="table-header">Point Repeatability Analysis</div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Point ID</th>
+                                <th>Count</th>
+                                <th>Min RL (m)</th>
+                                <th>Max RL (m)</th>
+                                <th>Spread (mm)</th>
+                                <th>Average RL (m)</th>
+                                <th>Observed RLs (m)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisTable"></tbody>
                     </table>
                 </div>
             </div>
@@ -591,7 +661,7 @@
         </div>
 
         <div style="text-align: center; padding: 20px; margin-top: 40px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px;">
-            Created by B Brewster • 2025
+            Created by B Brewster • © 2025
         </div>
     </div>
 
@@ -739,38 +809,41 @@
                             );
                             
                             if (mainDataStartIndex !== -1) {
-                                // Truncate the working `data` array to exclude calibration and start at the first TBM
                                 this.data = this.fullData.slice(mainDataStartIndex);
                                 showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test excluded. Processing ${this.data.length} main survey records.`, 'success');
                             } else {
-                                this.data = []; // No main survey data found after calibration
+                                this.data = []; 
                                 showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test found, but no subsequent survey data detected.`, 'warning');
                             }
                         }
                     }
                 } else {
                      // Case 2: No calibration, OR calibration found but RETAINED.
-                    if (this.calibrationInfo.isCalibration) { // This means retainCalibrationData is true
+                    if (this.calibrationInfo.isCalibration) { 
                          this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
-                    } else { // No calibration found
+                    } else { 
                          document.getElementById('formatStatus').classList.add('hidden');
                     }
-                    // In both sub-cases, the full dataset is processed, so show a generic success message.
                     showStatus(`✓ Parsed ${this.fullData.length} records successfully.`, 'success');
                 }
 
                 // Phase 3: Process the final selected dataset (either full or main)
                 this.calculateStatsForCurrentData();
             }
-            
+
             calculateStatsForCurrentData() {
-                const points = new Set();
-                const heights = [];
-                
-                // Re-build runs and stats using only the main survey data
+                // Build runs from the current data (which may be filtered)
                 this.levelRuns = this.buildLevelRuns(this.data); 
+                
+                // Calculate reduced levels based on these runs
+                this.calculateReducedLevels();
+                
+                // Aggregate change points
                 this.aggregatedRuns = this.aggregateChangePointRuns();
                 
+                // Gather statistics
+                const points = new Set();
+                const heights = [];
                 this.data.forEach(record => {
                     if (record.words['11']) {
                         points.add(record.words['11'].value);
@@ -791,7 +864,6 @@
                 };
             }
 
-
             analyzeGSIFormat(lines) {
                 const analysis = {
                     totalLines: lines.length,
@@ -811,19 +883,14 @@
                 for (let i = 0; i < maxSampleSize; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
-
                     const lineAnalysis = this.analyzeGSILine(line, i + 1);
-                    
                     if (lineAnalysis.isValid) {
                         analysis.validGSILines++;
-                        
                         lineAnalysis.wordIds.forEach(wi => {
                             analysis.wordCounts[wi] = (analysis.wordCounts[wi] || 0) + 1;
                         });
-                        
                         if (lineAnalysis.hasLevelingWords) analysis.hasLevelingData = true;
                         if (lineAnalysis.hasCoordinateWords) analysis.hasCoordinateData = true;
-                        
                     } else {
                         analysis.invalidLines.push({
                             lineNumber: i + 1,
@@ -832,27 +899,17 @@
                         });
                     }
                 }
-
                 this.determineGSIFormat(analysis);
                 return analysis;
             }
 
             analyzeGSILine(line, lineNumber) {
-                const result = {
-                    isValid: false,
-                    wordIds: [],
-                    hasLevelingWords: false,
-                    hasCoordinateWords: false,
-                    issues: []
-                };
-
+                const result = { isValid: false, wordIds: [], hasLevelingWords: false, hasCoordinateWords: false, issues: [] };
                 const words = line.split(/\s+/);
-                
                 if (words.length === 0) {
                     result.issues.push('Empty line');
                     return result;
                 }
-
                 let validWords = 0;
                 const levelingWIs = ['331', '332', '333', '330'];
                 const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
@@ -862,33 +919,30 @@
                         result.issues.push(`Word too short: ${word}`);
                         continue;
                     }
-
                     let wi, isValidStructure = false;
-                    
                     if (word.startsWith('*')) {
                         wi = word.substring(1, 3);
                         isValidStructure = /^\*\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
                     } else {
-                        if (/^\d{3}\./.test(word)) {
-                            wi = word.substring(0, 3);
+                        const first3 = word.substring(0, 3);
+                        const fourth = word.substring(3, 4);
+                        if (!isNaN(first3) && fourth === '.' && first3.length === 3 && parseInt(first3) >= 330 && parseInt(first3) <= 399) {
+                            wi = first3;
                             isValidStructure = /^\d{3}\.[\d\.]{2}[+\-]\d+$/.test(word);
                         } else {
                             wi = word.substring(0, 2);
                             isValidStructure = /^\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
                         }
                     }
-
                     if (isValidStructure && !isNaN(parseInt(wi))) {
                         validWords++;
                         result.wordIds.push(wi);
-                        
-                        if (levelingWIs.includes(wi)) result.hasLevelingData = true;
-                        if (coordinateWIs.includes(wi)) result.hasCoordinateData = true;
+                        if (levelingWIs.includes(wi)) result.hasLevelingWords = true;
+                        if (coordinateWIs.includes(wi)) result.hasCoordinateWords = true;
                     } else {
                         result.issues.push(`Invalid GSI word structure: ${word.substring(0, 20)}`);
                     }
                 }
-
                 result.isValid = validWords > 0;
                 return result;
             }
@@ -897,7 +951,6 @@
                 const tpsIndicators = ['16', '17', '18', '19', '58', '59', '71', '72', '73', '74', '75', '76'];
                 const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
                 const levelingWIs = ['331', '332', '333', '330'];
-
                 const hasTpsWords = tpsIndicators.some(wi => analysis.wordCounts[wi] > 0);
                 const hasCoordinates = coordinateWIs.some(wi => analysis.wordCounts[wi] > 0);
                 const hasLeveling = levelingWIs.some(wi => analysis.wordCounts[wi] > 0);
@@ -905,28 +958,22 @@
                 if (hasTpsWords || (hasCoordinates && !hasLeveling)) {
                     analysis.isTPS = true;
                     analysis.formatType = 'TPS';
-                    analysis.warnings.push('⚠️ TPS (Total Station) GSI detected - This parser is optimised for levelling data');
                 } else if (hasLeveling) {
                     analysis.formatType = 'Levelling';
                 } else if (hasCoordinates) {
                     analysis.formatType = 'Coordinate';
                     analysis.warnings.push('⚠️ Coordinate data detected - Limited support for non-levelling GSI');
                 }
-
                 const validLineRatio = analysis.validGSILines / Math.max(1, analysis.totalLines - this.countEmptyLines(analysis));
-                
                 if (validLineRatio < 0.7) {
                     analysis.errors.push(`❌ Poor GSI format: Only ${Math.round(validLineRatio * 100)}% of lines are valid GSI format`);
                 }
-
                 if (analysis.validGSILines === 0) {
                     analysis.errors.push('❌ No valid GSI data found - Check file format');
                 }
-
                 if (analysis.wordCounts['11'] === 0) {
                     analysis.warnings.push('⚠️ No point IDs (WI 11) found');
                 }
-
                 if (Object.keys(analysis.wordCounts).length < 3) {
                     analysis.warnings.push('⚠️ Very limited GSI word types detected');
                 }
@@ -940,9 +987,6 @@
                 const messages = [];
                 if (analysis.formatType !== 'unknown') {
                     messages.push(`📋 GSI Format: ${analysis.formatType}`);
-                }
-                if (analysis.isTPS) {
-                    messages.push('🔶 TPS GSI Detected: This file appears to contain Total Station data. This parser is specialised for levelling data and may not display all TPS features correctly.');
                 }
                 analysis.errors.forEach(error => messages.push(error));
                 analysis.warnings.forEach(warning => messages.push(warning));
@@ -963,12 +1007,10 @@
 
             showFormatStatus(message, type) {
                 let formatStatus = document.getElementById('formatStatus');
-                formatStatus.innerHTML = ''; // Clear previous content, including buttons
-                
+                formatStatus.innerHTML = ''; 
                 const textContainer = document.createElement('div');
                 textContainer.innerText = message;
                 formatStatus.appendChild(textContainer);
-                
                 formatStatus.className = 'status ' + type;
                 formatStatus.classList.remove('hidden');
                 formatStatus.style.whiteSpace = 'pre-line';
@@ -978,7 +1020,7 @@
 
             updateProcessingOptions(options) {
                 this.processingOptions = { ...this.processingOptions, ...options };
-                this.processAndAnalyze(); // Re-run the analysis with new options
+                this.processAndAnalyze(); 
                 return this.data;
             }
 
@@ -1182,7 +1224,7 @@
                     result.is2Peg = true;
                     result.confidence = 95;
                     result.recordRange = `Records ${recordNumbers[0]} to ${recordNumbers[recordNumbers.length - 1]}`;
-                    result.issues.push(`Classic 2-peg test sequence detected: ${patternStr}`);
+                    result.issues.push(`Classic 2-peg test sequence detected: ${patternStr}.`);
                     result.issues.push('This calibration data may affect survey calculations if included.');
                     return result;
                 }
@@ -1241,7 +1283,7 @@
 
             displayCalibrationWarning(calibrationInfo) {
                 const messages = [];
-                messages.push(`🔶 ${calibrationInfo.type.toUpperCase()} DETECTED (${calibrationInfo.confidence}% confidence)`);
+                messages.push(`🔶 ${calibrationInfo.type.toUpperCase()} DETECTED (${calibrationInfo.confidence}% confidence).`);
                 if (calibrationInfo.recordRange) {
                     messages.push(`📍 Located in ${calibrationInfo.recordRange}. These records will be excluded by default.`);
                 }
@@ -1255,7 +1297,6 @@
 
                 const formatStatusEl = document.getElementById('formatStatus');
                 
-                // Remove any old buttons first
                 const oldActions = formatStatusEl.querySelector('#calibration-actions');
                 if(oldActions) oldActions.remove();
 
@@ -1401,6 +1442,185 @@
                 return aggregatedRuns;
             }
 
+            calculateMisclose() {
+                if (!this.levelRuns || this.levelRuns.length < 1) {
+                    return null; // Not enough data for a check
+                }
+
+                let totalBS = 0;
+                let totalFS = 0;
+
+                // Use the raw, non-aggregated runs for the purest calculation of sums
+                this.levelRuns.forEach(run => {
+                    if (run.backsight && run.backsight.words['331']) {
+                        totalBS += run.backsight.words['331'].value;
+                    }
+                    run.foresights.forEach(fs => {
+                        if (fs.words['332']) {
+                            totalFS += fs.words['332'].value;
+                        }
+                    });
+                });
+
+                const measuredDiff = totalBS - totalFS;
+
+                // Find the first record in the main data with a height - this is our start point
+                const firstRecordWithHeight = this.data.find(r => r.words['83']);
+                
+                // Find the last foresight record in the main data
+                const lastForesightRecord = this.levelRuns[this.levelRuns.length - 1]?.foresights.slice(-1)[0];
+
+                if (!firstRecordWithHeight || !lastForesightRecord) {
+                    return { totalBS, totalFS, measuredDiff, type: 'incomplete' };
+                }
+
+                const startRL = firstRecordWithHeight.words['83'].value;
+                const startPointName = firstRecordWithHeight.words['11']?.value || 'Start';
+                
+                // Check if the final foresight point also has a known height in the original data
+                const endPointName = lastForesightRecord.words['11']?.value;
+                const lastPointRecordWithHeight = this.data.find(r => r.words['11']?.value === endPointName && r.words['83'] && r.lineNumber !== firstRecordWithHeight.lineNumber);
+
+                if (lastPointRecordWithHeight) {
+                    // This is a closed run between two known points
+                    const endRL = lastPointRecordWithHeight.words['83'].value;
+                    const knownDiff = endRL - startRL;
+                    const misclose = measuredDiff - knownDiff;
+                    
+                    return {
+                        totalBS,
+                        totalFS,
+                        measuredDiff,
+                        startRL,
+                        endRL,
+                        knownDiff,
+                        misclose,
+                        startPoint: startPointName,
+                        endPoint: endPointName,
+                        type: 'closed'
+                    };
+                } else {
+                    // This is an open run, starting from a known point
+                    return {
+                        totalBS,
+                        totalFS,
+                        measuredDiff,
+                        startPoint: startPointName,
+                        type: 'open'
+                    };
+                }
+            }
+
+            analyzePointRepeatability() {
+                const pointData = new Map();
+
+                // Group all calculated levels by point ID
+                this.data.forEach(record => {
+                    // Only consider foresight and intermediate sight records with a calculated level
+                    if ((record.type === 'foresight' || record.type === 'intermediate') && record.calculatedRL !== undefined) {
+                        const pointId = record.words['11']?.value;
+                        if (!pointId) return;
+
+                        // --- NEW LOGIC ---
+                        // If aggregation is enabled, skip points that are identified as change points.
+                        if (this.processingOptions.aggregateCP && this.isChangePoint(pointId)) {
+                            return; // Skip this record
+                        }
+                        // --- END NEW LOGIC ---
+
+                        if (!pointData.has(pointId)) {
+                            pointData.set(pointId, { rls: [] });
+                        }
+                        pointData.get(pointId).rls.push(record.calculatedRL);
+                    }
+                });
+
+                const analysisResults = [];
+                // Analyze points with more than one observation
+                for (const [pointId, data] of pointData.entries()) {
+                    if (data.rls.length > 1) {
+                        const min = Math.min(...data.rls);
+                        const max = Math.max(...data.rls);
+                        const sum = data.rls.reduce((a, b) => a + b, 0);
+                        
+                        analysisResults.push({
+                            pointId: pointId,
+                            count: data.rls.length,
+                            minRL: min,
+                            maxRL: max,
+                            spread: (max - min) * 1000, // Convert to mm
+                            avgRL: sum / data.rls.length,
+                            allRLs: data.rls.map(rl => rl.toFixed(4)).join(', ')
+                        });
+                    }
+                }
+                
+                // Sort by point ID for consistency
+                return analysisResults.sort((a, b) => a.pointId.localeCompare(b.pointId, undefined, { numeric: true }));
+            }
+
+            calculateReducedLevels() {
+                // Find the first point with a known height to start the calculation.
+                const firstBenchmark = this.data.find(rec => rec.words['83']);
+                if (!firstBenchmark) {
+                    console.warn("No starting elevation (WI 83) found. Cannot calculate reduced levels.");
+                    return; // Exit if no starting point
+                }
+
+                const knownLevels = {};
+                const startPointId = firstBenchmark.words['11'].value;
+                knownLevels[startPointId] = firstBenchmark.words['83'].value;
+
+                // Use a map for efficient lookup and modification of the original records
+                const recordMap = new Map(this.data.map(rec => [rec.lineNumber, rec]));
+
+                // Iterate through the raw, non-aggregated runs of the current dataset
+                for (const run of this.levelRuns) {
+                    const bsRecord = run.backsight;
+                    const bsPointId = bsRecord.words['11']?.value;
+
+                    // A setup must have a backsight to a point with a known level
+                    if (!bsPointId || typeof knownLevels[bsPointId] === 'undefined') {
+                        console.warn(`Skipping setup ${run.setupNumber}: Backsight point "${bsPointId}" has no known level.`);
+                        continue; // Can't calculate this setup, move to the next
+                    }
+                    
+                    const bsReading = bsRecord.words['331']?.value;
+                    if (typeof bsReading !== 'number') {
+                        console.warn(`Skipping setup ${run.setupNumber}: No valid backsight reading.`);
+                        continue;
+                    }
+
+                    const heightOfCollimation = knownLevels[bsPointId] + bsReading;
+
+                    // Process Intermediate Sights
+                    run.intermediates.forEach(isRecord => {
+                        const isPointId = isRecord.words['11']?.value;
+                        const isReading = isRecord.words['333']?.value;
+                        if (isPointId && typeof isReading === 'number') {
+                            const calculatedRL = heightOfCollimation - isReading;
+                            const originalRecord = recordMap.get(isRecord.lineNumber);
+                            if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Intermediate sights do not establish new known points, so we don't add them to knownLevels
+                        }
+                    });
+
+                    // Process Foresights
+                    run.foresights.forEach(fsRecord => {
+                        const fsPointId = fsRecord.words['11']?.value;
+                        const fsReading = fsRecord.words['332']?.value;
+                        if (fsPointId && typeof fsReading === 'number') {
+                            const calculatedRL = heightOfCollimation - fsReading;
+                            const originalRecord = recordMap.get(fsRecord.lineNumber);
+                            if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Add this new foresight level to our list of known levels for subsequent setups
+                            knownLevels[fsPointId] = calculatedRL;
+                        }
+                    });
+                }
+            }
+
+
             generateReport() {
                 let report = 'LEVELLING REPORT\n================\n\n';
 
@@ -1426,16 +1646,19 @@
                     report += cpInfo;
                 }
                 
-                report += '\nPOINT          TYPE          READING       DISTANCE      HEIGHT        SETUP\n';
-                report += '-----------------------------------------------------------------------\n';
+                report += '\nPOINT          TYPE          READING       DISTANCE      HEIGHT        CALCULATED RL SETUP\n';
+                report += '------------------------------------------------------------------------------------------\n';
                 
                 this.data.forEach(record => {
-                    const point = record.words['11']?.value || '';
-                    const dist = record.words['32'] ? record.words['32'].value.toFixed(3) : '';
-                    const hgt = record.words['83'] ? record.words['83'].value.toFixed(4) : '';
-                    const setup = record.setupNumber || '';
-                    let reading = ['331', '332', '333', '330'].map(wi => record.words[wi] ? record.words[wi].value.toFixed(5) : null).find(Boolean) || '';
-                    report += `${point.padEnd(14)} ${record.type.padEnd(13)} ${reading.padStart(13)} ${dist.padStart(13)} ${hgt.padStart(13)} ${String(setup).padStart(5)}\n`;
+                    const point = (record.words['11']?.value || '').padEnd(14);
+                    const type = record.type.padEnd(13);
+                    const reading = (['331', '332', '333', '330'].map(wi => record.words[wi] ? record.words[wi].value.toFixed(5) : null).find(Boolean) || '').padStart(13);
+                    const dist = (record.words['32'] ? record.words['32'].value.toFixed(3) : '').padStart(13);
+                    const hgt = (record.words['83'] ? record.words['83'].value.toFixed(4) : '').padStart(13);
+                    const calcRL = ((record.type === 'foresight' || record.type === 'intermediate') && record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4).padStart(13) : ''.padStart(13);
+                    const setup = (String(record.setupNumber) || '').padStart(5);
+                    
+                    report += `${point} ${type} ${reading} ${dist} ${hgt} ${calcRL} ${setup}\n`;
                 });
                 
                 if (this.levelRuns && this.levelRuns.length > 0) {
@@ -1481,6 +1704,30 @@
                         report += '\n';
                     });
                 }
+
+                const miscloseData = this.calculateMisclose();
+    
+                if (miscloseData) {
+                    report += '\nLEVEL RUN CLOSURE CHECK\n';
+                    report += '========================\n';
+                    report += `Total Backsight Sum (ΣBS) : ${miscloseData.totalBS.toFixed(5)} m\n`;
+                    report += `Total Foresight Sum (ΣFS) : ${miscloseData.totalFS.toFixed(5)} m\n`;
+                    report += `Measured ΔH (ΣBS - ΣFS)   : ${miscloseData.measuredDiff.toFixed(5)} m\n`;
+                    
+                    if (miscloseData.type === 'closed') {
+                        report += '------------------------\n';
+                        report += `Start Point (${miscloseData.startPoint}) RL: ${miscloseData.startRL.toFixed(4)} m\n`;
+                        report += `End Point   (${miscloseData.endPoint}) RL: ${miscloseData.endRL.toFixed(4)} m\n`;
+                        report += `Known ΔH (End RL - Start RL)  : ${miscloseData.knownDiff.toFixed(5)} m\n`;
+                        report += '------------------------\n';
+                        report += `Misclose                    : ${(miscloseData.misclose * 1000).toFixed(1)} mm\n`;
+                    } else {
+                        report += '------------------------\n';
+                        report += `Note: Run starts on point ${miscloseData.startPoint} but does not close on a point with a known height.\n`;
+                        report += 'Misclose can only be calculated for runs between two known benchmarks.\n';
+                    }
+                }
+                
                 return report;
             }
 
@@ -1500,7 +1747,7 @@
                 const firstPoint = this.data.find(r => r.words['11'] && r.words['83']);
                 if (firstPoint) {
                     output += '# Fixed elevation - uncomment if needed:\n';
-                    output += `#E ${firstPoint.words['11'].value} ${firstPoint.words['83'].value.toFixed(4)} ! \n\n`;
+                    output += `#E ${firstPoint.words['11'].value} ${firstPoint.words['83'].value.toFixed(4)}\n\n`;
                 }
                 
                 const runsToProcess = this.processingOptions.aggregateCP ? this.aggregatedRuns : this.levelRuns;
@@ -1552,14 +1799,18 @@
             }
 
             exportCSV() {
-                let csv = 'Point,Type,Reading,Distance,Height,Setup,Line\n';
+                let csv = 'Point,Type,Reading,Distance,Height,CalculatedRL,Setup,Line\n';
                 this.data.forEach(record => {
                     const point = record.words['11']?.value || '';
+                    const type = record.type;
+                    const reading = ['331', '332', '333', '330'].map(wi => record.words[wi]?.value).find(Boolean) || '';
                     const dist = record.words['32']?.value || '';
                     const hgt = record.words['83']?.value || '';
+                    const calcRL = (type === 'foresight' || type === 'intermediate') && record.calculatedRL !== undefined ? record.calculatedRL : '';
                     const setup = record.setupNumber || '';
-                    let reading = ['331', '332', '333', '330'].map(wi => record.words[wi]?.value).find(Boolean) || '';
-                    csv += `"${point}","${record.type}","${reading}","${dist}","${hgt}","${setup}","${record.lineNumber}"\n`;
+                    const line = record.lineNumber;
+                    
+                    csv += `"${point}","${type}","${reading}","${dist}","${hgt}","${calcRL}","${setup}","${line}"\n`;
                 });
                 return csv;
             }
@@ -1612,7 +1863,10 @@
             aboutBtn: document.getElementById('aboutBtn'),
             aboutSection: document.getElementById('aboutSection'),
             aboutToggle: document.getElementById('aboutToggle'),
-            toggleViewBtn: document.getElementById('toggleViewBtn')
+            toggleViewBtn: document.getElementById('toggleViewBtn'),
+            toggleViewBtn: document.getElementById('toggleViewBtn'),
+            analysisSection: document.getElementById('analysisSection'), 
+            analysisTable: document.getElementById('analysisTable')      
         };
 
         function initializeApp() {
@@ -1779,19 +2033,24 @@
                     parser = new GSIParser();
                     parser.parse(e.target.result);
                     
-                    // This block will now only be reached if parsing is successful
-                    if (parser.data.length === 0 && parser.calibrationInfo.isCalibration) {
-                         // This case happens if the file ONLY contained a calibration test
-                         updateUI();
-                         return; 
+                    if (parser.data.length === 0 && !parser.calibrationInfo.isCalibration) {
+                         showStatus('✗ No valid survey data found to process.', 'error');
+                         resetUI();
+                    } else {
+                        updateUI();
+                        elements.reportBtn.click();
+                        // Update the upload area to show the loaded file name
+                        elements.uploadArea.innerHTML = `
+                            <div style="font-size: 36px; margin-bottom: 10px;">📄</div>
+                            <div><strong>File Loaded:</strong> ${escapeHtml(file.name)}</div>
+                            <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                                Drop or click to load a new file.
+                            </div>
+                        `;
                     }
-                    
-                    updateUI();
-                    elements.reportBtn.click(); // Auto-generate and show the report
-                    
                 } catch (error) {
-                    resetUI(); // 1. Reset the UI elements first
-                    showStatus(`✗ ${escapeHtml(error.message)}`, 'error'); // 2. Then show the error message
+                    resetUI();
+                    showStatus(`✗ ${escapeHtml(error.message)}`, 'error');
                     console.error('Parsing error:', error);
                 } finally {
                     clearTimeout(timeoutId);
@@ -1807,10 +2066,26 @@
         }
         
         function resetUI() {
-            ['status', 'formatStatus', 'statsSection', 'actionsSection', 'previewSection', 'outputSection', 'advancedSection'].forEach(id => elements[id].classList.add('hidden'));
+            
+            ['status', 'formatStatus', 'statsSection', 'actionsSection', 'previewSection', 'outputSection', 'advancedSection', 'analysisSection'].forEach(id => {
+                if (elements[id]) {
+                    elements[id].classList.add('hidden');
+                }
+            });
+
             elements.dataTable.innerHTML = '';
-            elements.fileInput.value = ''; // Reset file input
-            isFullView = false; // Reset view toggle
+            elements.analysisTable.innerHTML = ''; // Also clear the analysis table content
+            elements.fileInput.value = '';
+            isFullView = false;
+            
+            // Restore original upload area content
+            elements.uploadArea.innerHTML = `
+                <div style="font-size: 36px; margin-bottom: 10px;">📁</div>
+                <div>Drop GSI file here or click to select</div>
+                <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                    Supports .gsi, .txt, and other level data formats
+                </div>
+            `;
         }
 
         function escapeHtml(text) {
@@ -1820,7 +2095,7 @@
         }
 
         function showStatus(message, type) {
-            elements.status.innerHTML = message; // Use innerHTML to allow line breaks
+            elements.status.innerHTML = message;
             elements.status.className = 'status ' + type;
             elements.status.classList.remove('hidden');
         }
@@ -1841,15 +2116,15 @@
                 elements.toggleViewBtn.style.display = 'none';
             }
 
-            // Determine which data to display
+            // Determine which data to display in the main preview
             const dataToDisplay = isFullView ? parser.data.slice(0, MAX_PREVIEW_ROWS) : parser.data.slice(0, 20);
 
-            // Update table
+            // Update main data table
             elements.dataTable.innerHTML = '';
             if (dataToDisplay.length === 0) {
                 const row = elements.dataTable.insertRow();
                 const cell = row.insertCell();
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.textContent = "No data to display in this view.";
                 cell.style.textAlign = 'center';
             } else {
@@ -1861,20 +2136,45 @@
                     const distance = record.words['32'] ? record.words['32'].value.toFixed(3) : '';
                     const height = record.words['83'] ? record.words['83'].value.toFixed(4) : '';
                     const setup = record.setupNumber || '';
+                    const calculatedRL = record.calculatedRL !== undefined ? record.calculatedRL.toFixed(4) : '';
 
                     row.innerHTML = `
                         <td>${escapeHtml(point)}</td>
                         <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
-                        <td>${escapeHtml(reading)}</td>
-                        <td>${escapeHtml(distance)}</td>
-                        <td>${escapeHtml(height)}</td>
-                        <td>${escapeHtml(String(setup))}</td>
+                        <td class="numeric">${escapeHtml(reading)}</td>
+                        <td class="numeric">${escapeHtml(distance)}</td>
+                        <td class="numeric">${escapeHtml(height)}</td>
+                        <td class="numeric"><span class="calculated-rl">${(type === 'foresight' || type === 'intermediate') ? calculatedRL : ''}</span></td>
+                        <td class="numeric">${escapeHtml(String(setup))}</td>
                     `;
                     elements.dataTable.appendChild(row);
                 });
             }
 
-            // Show sections
+            // --- NEW: Populate Repeatability Analysis Table ---
+            const analysisResults = parser.analyzePointRepeatability();
+            elements.analysisTable.innerHTML = ''; // Clear previous results
+            if (analysisResults.length > 0) {
+                analysisResults.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(item.pointId)}</td>
+                        <td class="numeric">${item.count}</td>
+                        <td class="numeric">${item.minRL.toFixed(4)}</td>
+                        <td class="numeric">${item.maxRL.toFixed(4)}</td>
+                        <td class="numeric">${item.spread.toFixed(1)}</td>
+                        <td class="numeric"><strong>${item.avgRL.toFixed(4)}</strong></td>
+                        <td><small>${escapeHtml(item.allRLs)}</small></td>
+                    `;
+                    elements.analysisTable.appendChild(row);
+                });
+                elements.analysisSection.classList.remove('hidden'); // Show the section
+            } else {
+                elements.analysisSection.classList.add('hidden'); // Hide if no repeated points
+            }
+
+
+            // Show main sections
             elements.statsSection.classList.remove('hidden');
             elements.actionsSection.classList.remove('hidden');
             elements.previewSection.classList.remove('hidden');
