@@ -183,7 +183,7 @@
             margin-bottom: 30px;
         }
 
-        numeric {
+        .numeric {
         text-align: right;
         font-variant-numeric: tabular-nums;
 }
@@ -305,7 +305,7 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 25px;
+            padding: 25px 45px;
         }
         
         #aboutSection .advanced-content p, 
@@ -402,6 +402,26 @@
             .table-container table {
                 min-width: 700px; /* Forces table to a minimum width, enabling horizontal scroll */
             }
+
+            .expander {
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            width: 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        .details-container {
+            padding: 15px;
+            background: var(--bg);
+        }
+
+        .details-container table {
+            font-size: 12px;
+        }
         }
         #aboutSection .advanced-content p, 
 #aboutSection .advanced-content li {
@@ -420,6 +440,12 @@
     color: #64b5f6; /* A clear blue for dark mode */
     font-weight: 500;
 }
+
+.qa-fail {
+            color: #ff4444; /* Red color to indicate a failure */
+            font-weight: bold;
+            cursor: help; /* Changes cursor to indicate more info is available on hover */
+        }
 
 [data-theme="light"] .calculated-rl {
     color: #0056b3; /* A darker blue for light mode */
@@ -499,23 +525,48 @@
         <div class="section hidden" id="statsSection">
             <div class="stats">
                 <div class="stat-card">
-                    <div class="stat-value" id="recordCount">0</div>
-                    <div class="stat-label">Records</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="pointCount">0</div>
-                    <div class="stat-label">Points</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="methodType">—</div>
+                    <div class="stat-value" id="statMethod"> — </div>
                     <div class="stat-label">Method</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="heightRange">—</div>
-                    <div class="stat-label">Height Range</div>
+                    <div class="stat-value" id="statSetups">0</div>
+                    <div class="stat-label">Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statObservations">0</div>
+                    <div class="stat-label">Observations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statPoints">0</div>
+                    <div class="stat-label">Unique Points</div>
                 </div>
             </div>
         </div>
+        
+        <div class="section hidden" id="tpsStatsSection">
+            <div class="stats">
+                 <div class="stat-card">
+                    <div class="stat-value" id="tpsStatMethod"> — </div>
+                    <div class="stat-label">Method</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatSetups">0</div>
+                    <div class="stat-label">Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatObservations">0</div>
+                    <div class="stat-label">Observations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatPoints">0</div>
+                    <div class="stat-label">Unique Points</div>
+                </div>
+            </div>
+        </div>
+
+
+
+        
 
         <div class="section hidden" id="actionsSection">
             <div class="actions">
@@ -526,11 +577,74 @@
             </div>
         </div>
 
-        <div class="section hidden" id="advancedSection">
+
+        <div class="section hidden" id="tpsActionsSection">
+    <div class="actions">
+        <button class="btn primary" id="tpsStarnetBtn">⭐ Export StarNet File</button>
+        <button class="btn" id="tpsAdvancedBtn">⚙️ Advanced</button>
+    </div>
+</div>
+        
+
+        <div class="section hidden" id="tpsAdvancedSection">
             <div class="section-title">
                 ⚙️ Advanced Processing Options
-                <button class="btn" id="advancedToggle">Hide</button>
+                <button class="btn" id="tpsAdvancedToggle">Hide</button>
             </div>
+
+    <div class="advanced-content">
+        <div class="advanced-grid">
+            <div class="advanced-group">
+                <h4>StarNet Export Options</h4>
+                <p class="help-text">Choose the data to be exported to the StarNet file.</p>
+                <div style="margin-bottom: 15px;">
+                    <label class="checkbox-label">
+                        <input type="radio" name="tpsExportMode" value="meaned" checked>
+                        <span>Meaned Observations (Recommended)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="radio" name="tpsExportMode" value="raw">
+                        <span>Raw Observations</span>
+                    </label>
+                </div>
+
+                <h4 style="margin-top: 20px;">QA Tolerances</h4>
+                <p class="help-text">Define acceptance criteria for QA checks. Spreads are checked within a single face; Face differences are checked between Face I and Face II.</p>
+                 <label class="form-label" for="qaHzSpread">Internal Hz Spread (arc-seconds)</label>
+                <input type="number" id="qaHzSpread" value="10" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaVaSpread">Internal V Spread (arc-seconds)</label>
+                <input type="number" id="qaVaSpread" value="15" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaSdSpread">Internal SD Spread (metres)</label>
+                <input type="number" id="qaSdSpread" value="0.005" step="0.001" class="form-input" style="margin-bottom: 10px;">
+
+            </div>
+
+            <div class="advanced-group">
+                <h4>Face Comparison Tolerances</h4>
+                <p class="help-text">Define acceptance criteria for Face I vs Face II comparisons.</p>
+                <label class="form-label" for="qaFaceHz">Face Hz Difference (arc-seconds)</label>
+                <input type="number" id="qaFaceHz" value="20" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaFaceVa">Face V Difference (arc-seconds)</label>
+                <input type="number" id="qaFaceVa" value="20" class="form-input" style="margin-bottom: 10px;">
+
+                <button class="btn primary" id="applyTpsAdvanced" style="margin-top: 25px;">
+                    <span id="applyTpsText">Apply & Reprocess</span>
+                    <div id="applyTpsSpinner" class="loading-spinner hidden" style="display: none;"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<div class="section hidden" id="advancedSection">
+    <div class="section-title">
+        ⚙️ Advanced TPS Options
+        <button class="btn" id="advancedToggle">Hide</button>
+    </div>
             
             <div class="advanced-content">
                 <div class="advanced-grid">
@@ -652,6 +766,37 @@
             </div>
         </div>
 
+        <div class="section hidden" id="tpsPreviewSection">
+    <div class="data-table">
+        <div class="table-header">
+            <span>TPS Observation Summary</span>
+            <div>
+                <button class="btn" id="tpsViewToggleBtn" style="padding: 5px 10px; font-size: 12px; margin-right: 10px;">Switch to Aggregated View</button>
+                <button class="btn" id="tpsShowAllBtn" style="padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
+            </div>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>At (Station)</th>
+                        <th>To (Point ID)</th>
+                        <th>Face</th>
+                        <th class="numeric">Hz Angle</th>
+                        <th class="numeric">V Angle</th>
+                        <th class="numeric">Slope Dist</th>
+                        <th class="numeric">Inst. Ht</th>
+                        <th class="numeric">Tgt. Ht</th>
+                    </tr>
+                </thead>
+                <tbody id="tpsDataTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+        
+
         <div class="section hidden" id="outputSection">
             <div class="output" id="outputArea"></div>
             <div>
@@ -713,6 +858,17 @@
                 this.levelRuns = [];
                 this.aggregatedRuns = [];
                 this.calibrationInfo = {};
+                this.fileType = 'unknown'; 
+                this.tpsSetups = [];
+                this.reducedTpsSetups = []; 
+                this.finalTpsObservations = [];
+                this.qaTolerances = {
+                    hzSpread: 10, // in seconds
+                    vaSpread: 15, // in seconds
+                    sdSpread: 0.005, // in meters
+                    faceHz: 20, // in seconds
+                    faceVa: 20  // in seconds
+                };
                 this.processingOptions = {
                     aggregateCP: true,
                     changePointPrefix: 'CP',
@@ -721,7 +877,8 @@
                     numericMax: 999,
                     includeTurnCount: false,
                     showCPDetails: false,
-                    retainCalibrationData: false
+                    retainCalibrationData: false,
+                    tpsExportMode: 'meaned'
                 };
             }
 
@@ -740,20 +897,15 @@
                 
                 // Perform a preliminary format check on the raw lines
                 const formatAnalysis = this.analyzeGSIFormat(lines);
+                this.fileType = formatAnalysis.formatType; // Save the detected file type
 
                 // --- VALIDATION GATE ---
-                // Check for fatal errors first. If found, throw an error to be caught by the caller.
                 if (formatAnalysis.errors.length > 0) {
                     throw new Error(formatAnalysis.errors.join('\n'));
                 }
-
-                // Check if it's TPS data and throw a specific, user-friendly error.
-                if (formatAnalysis.isTPS) {
-                    throw new Error('This appears to be a Total Station (TPS) GSI file. This tool is designed for levelling data only. Support for TPS data is in development.');
-                }
-                // --- END VALIDATION GATE ---
+                // We no longer throw an error for TPS files, we just handle them differently.
                 
-                // If the file is valid and not TPS, display any other non-fatal warnings
+                // If the file is valid, display any non-fatal warnings
                 this.displayFormatWarnings(formatAnalysis);
                 
                 let processedRecords = 0;
@@ -780,55 +932,55 @@
                 }
                 
                 this.fullData = [...this.data]; // Keep a copy of the full dataset
-                this.processAndAnalyze(); // Separate calibration data and calculate stats
+                this.processAndAnalyze(); // Separate calibration/setups and calculate stats
                 
                 return this.data;
             }
             
             processAndAnalyze() {
-                // Phase 1: Detect calibration data using the full dataset
-                const allRuns = this.buildLevelRuns(this.fullData);
-                this.calibrationInfo = this.identifyCalibrationData(allRuns);
+                if (this.fileType === 'TPS') {
+                    // --- TPS LOGIC PATH ---
+                    this.buildTpsSetups();
+                    this.reduceTpsSetups(); // Step 1: Group by Face
+                    this.meanFaceObservations(); // Step 2: Average the Faces
+                    
+                    // Log the final, fully reduced data structure to the console for verification.
+                    console.log("Final TPS Observations:", this.finalTpsObservations);
+                    showStatus(`✓ Parsed and fully processed ${this.fullData.length} TPS records.`, 'success');
 
-                this.data = [...this.fullData]; // Start with the full dataset
+                } else if (this.fileType === 'Levelling') {
+                    // --- LEVELLING LOGIC PATH (Existing Stable Logic) ---
+                    const allRuns = this.buildLevelRuns(this.fullData);
+                    this.calibrationInfo = this.identifyCalibrationData(allRuns);
+                    this.data = [...this.fullData];
 
-                // Phase 2: Decide whether to filter based on detection and options
-                if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
-                    // Case 1: Calibration found and EXCLUDED.
-                    this.displayCalibrationWarning(this.calibrationInfo);
-
-                    const endLineMatch = this.calibrationInfo.recordRange.match(/to\s(\d+)/);
-                    if (endLineMatch && endLineMatch[1]) {
-                        const endLine = parseInt(endLineMatch[1]);
-                        const calibrationEndIndex = this.fullData.findIndex(rec => rec.lineNumber === endLine);
-
-                        if (calibrationEndIndex !== -1) {
-                            // Find the first record *after* the calibration that has a '83' (height) value.
-                            const mainDataStartIndex = this.fullData.findIndex((rec, index) => 
-                                index > calibrationEndIndex && rec.words['83']
-                            );
-                            
-                            if (mainDataStartIndex !== -1) {
-                                this.data = this.fullData.slice(mainDataStartIndex);
-                                showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test excluded. Processing ${this.data.length} main survey records.`, 'success');
-                            } else {
-                                this.data = []; 
-                                showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test found, but no subsequent survey data detected.`, 'warning');
+                    if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
+                        this.displayCalibrationWarning(this.calibrationInfo);
+                        const endLineMatch = this.calibrationInfo.recordRange.match(/to\s(\d+)/);
+                        if (endLineMatch && endLineMatch[1]) {
+                            const endLine = parseInt(endLineMatch[1]);
+                            const calibrationEndIndex = this.fullData.findIndex(rec => rec.lineNumber === endLine);
+                            if (calibrationEndIndex !== -1) {
+                                const mainDataStartIndex = this.fullData.findIndex((rec, index) => index > calibrationEndIndex && rec.words['83']);
+                                if (mainDataStartIndex !== -1) {
+                                    this.data = this.fullData.slice(mainDataStartIndex);
+                                    showStatus(`✓ Parsed ${this.fullData.length} Level records. Calibration test excluded. Processing ${this.data.length} main survey records.`, 'success');
+                                } else {
+                                    this.data = []; 
+                                    showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test found, but no subsequent survey data detected.`, 'warning');
+                                }
                             }
                         }
+                    } else {
+                        if (this.calibrationInfo.isCalibration) { 
+                             this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
+                        } else { 
+                             document.getElementById('formatStatus').classList.add('hidden');
+                        }
+                        showStatus(`✓ Parsed ${this.fullData.length} level records successfully.`, 'success');
                     }
-                } else {
-                     // Case 2: No calibration, OR calibration found but RETAINED.
-                    if (this.calibrationInfo.isCalibration) { 
-                         this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
-                    } else { 
-                         document.getElementById('formatStatus').classList.add('hidden');
-                    }
-                    showStatus(`✓ Parsed ${this.fullData.length} records successfully.`, 'success');
+                    this.calculateStatsForCurrentData();
                 }
-
-                // Phase 3: Process the final selected dataset (either full or main)
-                this.calculateStatsForCurrentData();
             }
 
             calculateStatsForCurrentData() {
@@ -1028,7 +1180,7 @@
                 const words = line.split(/\s+/);
                 const record = { words: {}, type: 'unknown' };
                 for (const word of words) {
-                    const parsed = this.parseWord(word);
+                    const parsed = this.parseWord(word, this.fileType);
                     if (parsed) {
                         record.words[parsed.wi] = parsed;
                     }
@@ -1040,57 +1192,92 @@
                 return Object.keys(record.words).length > 0 ? record : null;
             }
 
-            parseWord(word) {
-                if (word.length < 8 || word.length > 100) return null;
+            parseWord(word, fileType) {
+                if (word.length < 8) return null;
                 let wi, info, sign, data;
-                if (word.startsWith('*')) {
-                    wi = word.substring(1, 3);
-                    info = word.substring(3, 7);
-                    sign = word.substring(7, 8);
-                    data = word.substring(8);
+
+                if (fileType === 'TPS') {
+                    // --- CORRECTED TPS LOGIC ---
+                    // It now handles words with or without a leading asterisk.
+                    let wordToParse = word;
+                    if (word.startsWith('*')) {
+                        wordToParse = word.substring(1); // Remove asterisk for consistent parsing
+                    }
+
+                    wi = wordToParse.substring(0, 2);
+                    info = wordToParse.substring(2, 6);
+                    sign = wordToParse.substring(6, 7);
+                    data = wordToParse.substring(7);
+
                 } else {
-                    const first3 = word.substring(0, 3);
-                    const fourth = word.substring(3, 4);
-                    if (!isNaN(first3) && fourth === '.' && first3.length === 3 && 
-                        parseInt(first3) >= 330 && parseInt(first3) <= 399) {
-                        wi = first3;
-                        info = word.substring(3, 6);
-                        sign = word.substring(6, 7);
-                        data = word.substring(7);
+                    // --- ORIGINAL, STABLE LEVELING LOGIC ---
+                    if (word.startsWith('*')) {
+                        // GSI-8 leveling logic
+                        wi = word.substring(1, 3);
+                        info = word.substring(3, 7);
+                        sign = word.substring(7, 8);
+                        data = word.substring(8);
                     } else {
-                        wi = word.substring(0, 2);
-                        info = word.substring(2, 6);
-                        sign = word.substring(6, 7);
-                        data = word.substring(7);
+                        // GSI-16 leveling logic
+                        const first3 = word.substring(0, 3);
+                        const fourth = word.substring(3, 4);
+                        if (!isNaN(first3) && fourth === '.' && first3.length === 3 &&
+                            parseInt(first3) >= 330 && parseInt(first3) <= 399) {
+                            wi = first3;
+                            info = word.substring(3, 6);
+                            sign = word.substring(6, 7);
+                            data = word.substring(7);
+                        } else {
+                            wi = word.substring(0, 2);
+                            info = word.substring(2, 6);
+                            sign = word.substring(6, 7);
+                            data = word.substring(7);
+                        }
                     }
                 }
-                if (wi && isNaN(parseInt(wi))) {
-                    console.warn('Non-numeric WI detected:', wi, 'in word:', word.substring(0, 20));
-                    return null;
-                }
+                
+                // --- Common logic for both types ---
+                if (!wi || (sign !== '+' && sign !== '-')) return null;
+                if (isNaN(parseInt(wi))) return null;
+                
                 const value = this.interpretValue(wi, sign + data, info);
                 return { wi, info, sign, data, value };
             }
 
             interpretValue(wi, valueStr, info) {
-                if (wi === '11') {
-                    let cleaned = valueStr.replace(/^[+\-0]*/, '');
-                    cleaned = cleaned.replace(/^0+/, '') || valueStr;
-                    if (!cleaned || cleaned.length === 0) {
-                        cleaned = valueStr;
-                    }
-                    return cleaned;
+                // A list of Word IDs that are known to contain text/string data
+                const stringTypeWIs = ['11', '41', '42', '44']; 
+                
+                if (stringTypeWIs.includes(wi)) {
+                    // If the Word ID is in our list, treat it as text.
+                    // This removes the leading +/- sign and any padding zeros.
+                    return valueStr.substring(1).replace(/^0+/, '');
                 }
-                const num = parseInt(valueStr);
+
+                // For all other Word IDs, process them as numbers.
+                // This handles both TPS coordinates (with decimals) and leveling data (scaled integers).
+                
+                if (valueStr.includes('.')) {
+                    const num = parseFloat(valueStr);
+                    return isNaN(num) ? 0 : num;
+                }
+
+                const num = parseInt(valueStr, 10);
                 if (isNaN(num)) {
-                    console.warn('Non-numeric value for WI', wi, ':', valueStr);
                     return 0;
                 }
+
+                // Handle non-scaled integers like measurement counts
+                if (['390', '391', '392'].includes(wi)) {
+                    return num;
+                }
+
+                // Apply standard GSI scaling for leveling data
                 const pos6 = info.charAt(info.length - 1);
                 let scale = 1000;
                 if (pos6 === '6') scale = 10000;
                 else if (pos6 === '8') scale = 100000;
-                if (['390', '391', '392'].includes(wi)) return num;
+                
                 return num / scale;
             }
             
@@ -1352,6 +1539,228 @@
                 });
                 
                 return runs;
+            }
+
+            buildTpsSetups() {
+                const setups = [];
+                let currentSetup = null;
+
+                this.fullData.forEach(record => {
+                    // A new instrument setup is defined by a Code Block (WI 41)
+                    if (record.words['41']) {
+                        currentSetup = {
+                            setupNumber: setups.length + 1,
+                            stationName: record.words['42']?.value || `STN${setups.length + 1}`,
+                            instrumentHeight: record.words['43']?.value || 0,
+                            observations: [], // A single, simple array for all observations
+                            setupRecord: record
+                        };
+                        setups.push(currentSetup);
+                    } 
+                    // All other measurement records are now treated as observations ("To" points)
+                    else if (currentSetup && record.words['11'] && record.words['21']) {
+                        // --- NEW: Identify Face ---
+                        const vaStr = record.words['22']?.data;
+                        if (vaStr) {
+                            const vaDecimal = gsiAngleToDecimal(vaStr);
+                            // Add the face property directly to the record object
+                            record.face = (vaDecimal > 180 && vaDecimal < 360) ? 'Face II' : 'Face I';
+                        } else {
+                            record.face = 'N/A';
+                        }
+                        // --- END NEW ---
+                        currentSetup.observations.push(record);
+                    }
+                });
+                this.tpsSetups = setups;
+            }
+
+            
+            // This is a helper function to correctly average circular values like angles.
+            meanAngles(angles) {
+                const toRad = Math.PI / 180;
+                const toDeg = 180 / Math.PI;
+                let sumX = 0;
+                let sumY = 0;
+
+                angles.forEach(angle => {
+                    const rad = angle * toRad;
+                    sumX += Math.cos(rad);
+                    sumY += Math.sin(rad);
+                });
+
+                if (angles.length === 0) return 0;
+
+                const avgRad = Math.atan2(sumY / angles.length, sumX / angles.length);
+                let avgDeg = avgRad * toDeg;
+                
+                if (avgDeg < 0) {
+                    avgDeg += 360;
+                }
+                
+                return avgDeg;
+            }
+
+            reduceTpsSetups() {
+                this.reducedTpsSetups = this.tpsSetups.map((setup, index, allSetups) => {
+                    const observationsByPoint = new Map();
+                    setup.observations.forEach(obs => {
+                        const pointId = obs.words['11']?.value;
+                        if (!pointId) return;
+                        if (!observationsByPoint.has(pointId)) {
+                            observationsByPoint.set(pointId, []);
+                        }
+                        observationsByPoint.get(pointId).push(obs);
+                    });
+
+                    const reducedObservations = [];
+                    for (const [pointId, observations] of observationsByPoint.entries()) {
+                        if (observations.length === 0) continue;
+
+                        const obsWithFace = observations.map(obs => {
+                            const vaStr = obs.words['22']?.data;
+                            const vaDecimal = vaStr ? gsiAngleToDecimal(vaStr) : 0;
+                            const face = (vaDecimal > 180 && vaDecimal < 360) ? 'Face II' : 'Face I';
+                            return { ...obs, face, vaDecimal };
+                        });
+
+                        const faceI_obs = obsWithFace.filter(o => o.face === 'Face I');
+                        const faceII_obs = obsWithFace.filter(o => o.face === 'Face II');
+                        
+                        let faceICheck = { status: 'N/A', values: {} };
+                        let faceIICheck = { status: 'N/A', values: {} };
+
+                        // --- QA CHECK 1: Internal Spread Check for each face ---
+                        [faceI_obs, faceII_obs].forEach((faceGroup, i) => {
+                            if (faceGroup.length > 1) {
+                                const faceName = i === 0 ? 'Face I' : 'Face II';
+                                const checkResult = { status: 'pass', values: {} };
+                                
+                                const hzDecimals = faceGroup.map(o => gsiAngleToDecimal(o.words['21'].data));
+                                const vaDecimals = faceGroup.map(o => o.vaDecimal);
+                                const sdValues = faceGroup.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+
+                                const hzRange = (Math.max(...hzDecimals) - Math.min(...hzDecimals)) * 3600; // to seconds
+                                const vaRange = (Math.max(...vaDecimals) - Math.min(...vaDecimals)) * 3600; // to seconds
+                                const sdRange = Math.max(...sdValues) - Math.min(...sdValues);
+
+                                if (hzRange > this.qaTolerances.hzSpread) checkResult.status = 'fail';
+                                if (vaRange > this.qaTolerances.vaSpread) checkResult.status = 'fail';
+                                if (sdRange > this.qaTolerances.sdSpread) checkResult.status = 'fail';
+
+                                checkResult.values = { hzRange, vaRange, sdRange };
+                                if(i === 0) faceICheck = checkResult; else faceIICheck = checkResult;
+                            }
+                        });
+
+
+                        // --- Data Averaging ---
+                        const avgFaceI = this.averageObservations(faceI_obs);
+                        const avgFaceII = this.averageObservations(faceII_obs);
+
+                        // --- QA CHECK 2: Face I vs Face II Comparison ---
+                        let faceComparisonCheck = { status: 'N/A', values: {} };
+                        if (avgFaceI && avgFaceII) {
+                            faceComparisonCheck.status = 'pass';
+                            const hzDiff = Math.abs(avgFaceI.meanHz - (avgFaceII.meanHz > 180 ? avgFaceII.meanHz - 180 : avgFaceII.meanHz + 180)) * 3600;
+                            const vaSum = avgFaceI.meanV + avgFaceII.meanV;
+                            const vaDiff = Math.abs(360 - vaSum) * 3600;
+                            
+                            if (hzDiff > this.qaTolerances.faceHz) faceComparisonCheck.status = 'fail';
+                            if (vaDiff > this.qaTolerances.faceVa) faceComparisonCheck.status = 'fail';
+                            faceComparisonCheck.values = { hzDiff, vaDiff };
+                        }
+                        
+                        // Push a reduced observation for each face that has data
+                        if (avgFaceI) reducedObservations.push({ ...avgFaceI, qa: { spread: faceICheck, face: faceComparisonCheck } });
+                        if (avgFaceII) reducedObservations.push({ ...avgFaceII, qa: { spread: faceIICheck, face: faceComparisonCheck } });
+                    }
+                    
+                    const backsight = setup.observations[0]; // Simple heuristic for now
+                    return { ...setup, backsight, reducedObservations };
+                });
+            }
+
+            meanFaceObservations() {
+                const finalObservations = [];
+
+                this.reducedTpsSetups.forEach(setup => {
+                    const obsByPoint = new Map();
+                    // Group the already-reduced observations by pointId
+                    setup.reducedObservations.forEach(obs => {
+                        if (!obsByPoint.has(obs.pointId)) {
+                            obsByPoint.set(obs.pointId, []);
+                        }
+                        obsByPoint.get(obs.pointId).push(obs);
+                    });
+
+                    for (const [pointId, observations] of obsByPoint.entries()) {
+                        const faceI = observations.find(o => o.face === 'Face I');
+                        const faceII = observations.find(o => o.face === 'Face II');
+                        
+                        let finalObs;
+
+                        if (faceI && faceII) {
+                            // --- Case 1: We have both faces, calculate a mean ---
+                            const correctedHzII = faceII.meanHz > 180 ? faceII.meanHz - 180 : faceII.meanHz + 180;
+                            const meanHz = this.meanAngles([faceI.meanHz, correctedHzII]);
+                            const meanV = (faceI.meanV + (360 - faceII.meanV)) / 2;
+                            const meanSd = (faceI.meanSd + faceII.meanSd) / 2;
+                            const meanHr = (faceI.targetHeight + faceII.targetHeight) / 2;
+
+                            finalObs = {
+                                pointId,
+                                meanHz,
+                                meanV,
+                                meanSd,
+                                targetHeight: meanHr,
+                                faceData: { faceI, faceII } // Keep intermediate data
+                            };
+
+                        } else if (faceI || faceII) {
+                            // --- Case 2: Only one face was observed ---
+                            const obs = faceI || faceII;
+                            finalObs = {
+                                ...obs,
+                                faceData: { [obs.face.replace(' ', '')]: obs } // Store the single face
+                            };
+                        }
+
+                        if (finalObs) {
+                            finalObservations.push({
+                                atStation: setup.stationName,
+                                toPoint: pointId,
+                                instHt: setup.instrumentHeight,
+                                ...finalObs
+                            });
+                        }
+                    }
+                });
+                this.finalTpsObservations = finalObservations;
+            }
+
+            averageObservations(observations) {
+                if (!observations || observations.length === 0) {
+                    return null;
+                }
+                const pointId = observations[0].words['11'].value;
+                const face = observations[0].face;
+
+                const hzDecimals = observations.map(o => gsiAngleToDecimal(o.words['21'].data));
+                const vDecimals = observations.map(o => o.vaDecimal);
+                const sdValues = observations.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+                const hrValues = observations.map(o => o.words['87']?.value).filter(v => typeof v === 'number');
+
+                return {
+                    pointId,
+                    face,
+                    count: observations.length,
+                    meanHz: this.meanAngles(hzDecimals),
+                    meanV: this.meanAngles(vDecimals),
+                    meanSd: sdValues.length > 0 ? sdValues.reduce((a, b) => a + b, 0) / sdValues.length : 0,
+                    targetHeight: hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : 0,
+                    rawObservations: observations
+                };
             }
 
             isChangePoint(pointId) {
@@ -1814,15 +2223,111 @@
                 });
                 return csv;
             }
+
+            exportTpsStarNet() {
+    let output = `# StarNet data file created by GSI.PARSER\n`;
+    output += `# Generated: ${new Date().toLocaleString()}\n`;
+    output += `# Export Mode: ${this.processingOptions.tpsExportMode}\n\n`;
+
+    // Helper function to convert decimal degrees to DDD-MM-SS format
+    const decimalToDMS = (decimal) => {
+        let deg = Math.floor(decimal);
+        let minFloat = (decimal - deg) * 60;
+        let min = Math.floor(minFloat);
+        let sec = Math.round((minFloat - min) * 60);
+        if (sec === 60) { min++; sec = 0; }
+        if (min === 60) { deg++; min = 0; }
+        return `${deg}-${String(min).padStart(2, '0')}-${String(sec).padStart(2, '0')}`;
+    };
+
+    // Helper to format raw GSI angle string (e.g., "35612460") to DMS
+    const gsiAngleToDMS = (gsiAngleStr) => {
+        if (!gsiAngleStr) return '0-00-00';
+        const parts = formatGsiAngle(gsiAngleStr, true); // Use existing helper
+        return `${parts.deg}-${String(parts.min).padStart(2, '0')}-${String(Math.round(parts.sec)).padStart(2, '0')}`;
+    };
+
+    if (this.processingOptions.tpsExportMode === 'raw') {
+        // --- RAW EXPORT LOGIC ---
+        this.tpsSetups.forEach(setup => {
+            output += `# Instrument Setup at station: ${setup.stationName}\n`;
+            output += `DB ${setup.stationName}\n`;
+            setup.observations.forEach(obs => {
+                const target = obs.words['11']?.value || '???';
+                const hzDMS = gsiAngleToDMS(obs.words['21']?.data);
+                const vDMS = gsiAngleToDMS(obs.words['22']?.data);
+                const sd = obs.words['31']?.value.toFixed(3) || '0.000';
+                const instHt = setup.instrumentHeight.toFixed(4);
+                const tgtHt = obs.words['87']?.value.toFixed(4) || instHt; // Use instHt as fallback
+                output += `DM ${target} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n`;
+            });
+            output += `DE\n\n`;
+        });
+
+    } else {
+        // --- MEANED EXPORT LOGIC (Existing Logic) ---
+        const setups = new Map();
+        this.finalTpsObservations.forEach(obs => {
+            if (!setups.has(obs.atStation)) {
+                setups.set(obs.atStation, []);
+            }
+            setups.get(obs.atStation).push(obs);
+        });
+
+        for (const [station, observations] of setups.entries()) {
+            output += `# Instrument Setup at station: ${station}\n`;
+            output += `DB ${station}\n\n`;
+            observations.forEach(obs => {
+                const faceICount = obs.faceData.faceI?.count || 0;
+                const faceIICount = obs.faceData.faceII?.count || 0;
+                let comment = `# Mean of ${faceICount + faceIICount} raw observation(s)`;
+                if (faceICount > 0 && faceIICount > 0) comment += ` (${faceICount} FL, ${faceIICount} FR)`;
+                output += `${comment}\n`;
+
+                const hzDMS = decimalToDMS(obs.meanHz);
+                const vDMS = decimalToDMS(obs.meanV);
+                const sd = obs.meanSd.toFixed(3);
+                const instHt = obs.instHt.toFixed(4);
+                const tgtHt = obs.targetHeight.toFixed(4);
+                output += `DM ${obs.toPoint} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n\n`;
+            });
+            output += `DE\n\n`;
         }
+    }
+
+    output += `# End of data file\n`;
+    return output;
+}
+
+            updateTpsOptions(options) {
+        // Update QA Tolerances
+        this.qaTolerances.hzSpread = parseFloat(options.qaHzSpread) || 10;
+        this.qaTolerances.vaSpread = parseFloat(options.qaVaSpread) || 15;
+        this.qaTolerances.sdSpread = parseFloat(options.qaSdSpread) || 0.005;
+        this.qaTolerances.faceHz = parseFloat(options.qaFaceHz) || 20;
+        this.qaTolerances.faceVa = parseFloat(options.qaFaceVa) || 20;
+
+        // Update other processing options
+        this.processingOptions.tpsExportMode = options.tpsExportMode || 'meaned';
+
+        // Re-run the analysis with the new settings
+        this.reduceTpsSetups();
+        this.meanFaceObservations();
+    }
+        }
+
+        
 
         // --- Global App State & Functions ---
         
-        let parser; // Will be initialized on file load
+        let parser = new GSIParser(); // Initialize parser on page load
         let currentOutput = '';
         let currentFilename = 'export';
         let currentExtension = 'txt';
         let isFullView = false;
+        let tpsViewMode = 'raw'; // Add this line ('raw' or 'aggregated')
+        let tpsIsFullView = false;
+        
 
         const elements = {
             themeBtn: document.getElementById('themeBtn'),
@@ -1830,25 +2335,64 @@
             fileInput: document.getElementById('fileInput'),
             status: document.getElementById('status'),
             formatStatus: document.getElementById('formatStatus'),
+            
+            
+            // UI Sections
             statsSection: document.getElementById('statsSection'),
+            tpsStatsSection: document.getElementById('tpsStatsSection'),
             actionsSection: document.getElementById('actionsSection'),
             previewSection: document.getElementById('previewSection'),
+            analysisSection: document.getElementById('analysisSection'),
+            tpsPreviewSection: document.getElementById('tpsPreviewSection'),
             outputSection: document.getElementById('outputSection'),
+            advancedSection: document.getElementById('advancedSection'),
+
+            // UI Components
             dataTable: document.getElementById('dataTable'),
+            tpsDataTable: document.getElementById('tpsDataTable'),
+            analysisTable: document.getElementById('analysisTable'),
             outputArea: document.getElementById('outputArea'),
-            recordCount: document.getElementById('recordCount'),
-            pointCount: document.getElementById('pointCount'),
-            methodType: document.getElementById('methodType'),
-            heightRange: document.getElementById('heightRange'),
+            toggleViewBtn: document.getElementById('toggleViewBtn'),
+            tpsViewToggleBtn: document.getElementById('tpsViewToggleBtn'),
+            tpsShowAllBtn: document.getElementById('tpsShowAllBtn'),
+            tpsActionsSection: document.getElementById('tpsActionsSection'),
+            tpsStarnetBtn: document.getElementById('tpsStarnetBtn'),     
+            tpsAdvancedBtn: document.getElementById('tpsAdvancedBtn'),
+            tpsAdvancedSection: document.getElementById('tpsAdvancedSection'),
+            tpsAdvancedToggle: document.getElementById('tpsAdvancedToggle'),
+            applyTpsAdvanced: document.getElementById('applyTpsAdvanced'),
+            applyTpsText: document.getElementById('applyTpsText'),
+            applyTpsSpinner: document.getElementById('applyTpsSpinner'),
+            qaHzSpread: document.getElementById('qaHzSpread'),
+            qaVaSpread: document.getElementById('qaVaSpread'),
+            qaSdSpread: document.getElementById('qaSdSpread'),
+            qaFaceHz: document.getElementById('qaFaceHz'),
+            qaFaceVa: document.getElementById('qaFaceVa'), 
+            
+            // Harmonized Stat Values
+            statMethod: document.getElementById('statMethod'),
+            statSetups: document.getElementById('statSetups'),
+            statObservations: document.getElementById('statObservations'),
+            statPoints: document.getElementById('statPoints'),
+            tpsStatMethod: document.getElementById('tpsStatMethod'),
+            tpsStatSetups: document.getElementById('tpsStatSetups'),
+            tpsStatObservations: document.getElementById('tpsStatObservations'),
+            tpsStatPoints: document.getElementById('tpsStatPoints'),
+            
+            // Buttons and Controls
             reportBtn: document.getElementById('reportBtn'),
             starnetBtn: document.getElementById('starnetBtn'),
             csvBtn: document.getElementById('csvBtn'),
             advancedBtn: document.getElementById('advancedBtn'),
             downloadBtn: document.getElementById('downloadBtn'),
             copyBtn: document.getElementById('copyBtn'),
-            advancedSection: document.getElementById('advancedSection'),
             advancedToggle: document.getElementById('advancedToggle'),
             applyAdvanced: document.getElementById('applyAdvanced'),
+            aboutBtn: document.getElementById('aboutBtn'),
+            aboutSection: document.getElementById('aboutSection'),
+            aboutToggle: document.getElementById('aboutToggle'),
+
+            // Advanced Options Form
             aggregateCP: document.getElementById('aggregateCP'),
             changePointPrefix: document.getElementById('changePointPrefix'),
             includeTurnCount: document.getElementById('includeTurnCount'),
@@ -1859,15 +2403,62 @@
             numericMin: document.getElementById('numericMin'),
             numericMax: document.getElementById('numericMax'),
             applyText: document.getElementById('applyText'),
-            applySpinner: document.getElementById('applySpinner'),
-            aboutBtn: document.getElementById('aboutBtn'),
-            aboutSection: document.getElementById('aboutSection'),
-            aboutToggle: document.getElementById('aboutToggle'),
-            toggleViewBtn: document.getElementById('toggleViewBtn'),
-            toggleViewBtn: document.getElementById('toggleViewBtn'),
-            analysisSection: document.getElementById('analysisSection'), 
-            analysisTable: document.getElementById('analysisTable')      
+            applySpinner: document.getElementById('applySpinner')
         };
+
+
+        function formatGsiAngle(gsiAngleStr, raw = false) {
+            if (!gsiAngleStr || gsiAngleStr.length < 5) { // Need at least MMSSs
+                return raw ? {deg:0, min:0, sec:0} : '—';
+            }
+            
+            const len = gsiAngleStr.length;
+            const tenth = gsiAngleStr.substring(len - 1);
+            const secStr = gsiAngleStr.substring(len - 3, len - 1);
+            const minStr = gsiAngleStr.substring(len - 5, len - 3);
+            let degStr = gsiAngleStr.substring(0, len - 5);
+
+            if (degStr === '') {
+                degStr = '0';
+            }
+
+            const deg = parseInt(degStr, 10);
+            const min = parseInt(minStr, 10);
+            const sec = parseFloat(`${secStr}.${tenth}`);
+
+            if (raw) {
+                // Return a raw object for calculations
+                return { deg, min, sec };
+            }
+
+            // Return a formatted string for display
+            return `${deg}° ${minStr}' ${secStr}.${tenth}"`;
+        }
+
+        function formatDecimalDegrees(decimal) {
+            if (typeof decimal !== 'number' || isNaN(decimal)) return '—';
+            
+            const deg = Math.floor(decimal);
+            const minFloat = (decimal - deg) * 60;
+            const min = Math.floor(minFloat);
+            const sec = ((minFloat - min) * 60).toFixed(1);
+
+            // Pad minutes and seconds with a leading zero if they are less than 10
+            const minStr = String(min).padStart(2, '0');
+            const secStr = parseFloat(sec) < 10 ? '0' + sec : sec;
+
+            return `${deg}° ${minStr}' ${secStr}"`;
+        }
+
+        
+
+        function gsiAngleToDecimal(gsiAngleStr) {
+            const angle = formatGsiAngle(gsiAngleStr, true); // Get raw parts
+            return angle.deg + angle.min / 60 + angle.sec / 3600;
+        }
+
+
+
 
         function initializeApp() {
             setupEventListeners();
@@ -1876,6 +2467,50 @@
 
         function setupEventListeners() {
             elements.themeBtn.addEventListener('click', toggleTheme);
+            elements.tpsStarnetBtn.addEventListener('click', () => {
+        currentExtension = 'dat'; // StarNet files often use .dat
+        showOutput(parser.exportTpsStarNet(), 'StarNet (TPS)');
+    });
+
+    elements.tpsAdvancedBtn.addEventListener('click', toggleTpsAdvancedSection);
+
+    elements.tpsAdvancedToggle.addEventListener('click', hideTpsAdvancedSection);
+
+    elements.applyTpsAdvanced.addEventListener('click', () => {
+        const button = elements.applyTpsAdvanced;
+        button.disabled = true;
+        elements.applyTpsText.style.display = 'none';
+        elements.applyTpsSpinner.style.display = 'inline-block';
+
+        try {
+            const newOptions = {
+                tpsExportMode: document.querySelector('input[name="tpsExportMode"]:checked').value,
+                qaHzSpread: elements.qaHzSpread.value,
+                qaVaSpread: elements.qaVaSpread.value,
+                qaSdSpread: elements.qaSdSpread.value,
+                qaFaceHz: elements.qaFaceHz.value,
+                qaFaceVa: elements.qaFaceVa.value
+            };
+
+            parser.updateTpsOptions(newOptions);
+            updateTpsUI(); // Re-render the UI with new QA results
+
+            elements.applyTpsText.textContent = '✓ Applied';
+        } catch (error) {
+            console.error('Error applying TPS settings:', error);
+            showStatus(`✗ Error reprocessing: ${error.message}`, 'error');
+        } finally {
+            setTimeout(() => {
+                elements.applyTpsSpinner.style.display = 'none';
+                elements.applyTpsText.style.display = 'inline';
+                button.disabled = false;
+                setTimeout(() => {
+                    elements.applyTpsText.textContent = 'Apply & Reprocess';
+                }, 2000);
+            }, 300);
+        }
+    });
+
             elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
             elements.uploadArea.addEventListener('dragover', handleDragOver);
             elements.uploadArea.addEventListener('dragleave', handleDragLeave);
@@ -1906,10 +2541,34 @@
             });
             elements.downloadBtn.addEventListener('click', downloadOutput);
             elements.copyBtn.addEventListener('click', copyOutput);
+            
+         
             elements.toggleViewBtn.addEventListener('click', () => {
                 isFullView = !isFullView;
-                updateUI();
+                updateLevelingUI(); 
             });
+
+            elements.tpsShowAllBtn.addEventListener('click', () => {
+                tpsIsFullView = !tpsIsFullView;
+                updateTpsUI(); // Re-render the table
+            });
+
+            elements.tpsDataTable.addEventListener('click', (e) => {
+                if (e.target && e.target.classList.contains('expander')) {
+                    const targetId = e.target.dataset.targetId;
+                    const detailsRow = document.getElementById(targetId);
+                    if (detailsRow) {
+                        detailsRow.classList.toggle('hidden');
+                        e.target.textContent = detailsRow.classList.contains('hidden') ? '+' : '−';
+                    }
+                }
+            });
+
+            elements.tpsViewToggleBtn.addEventListener('click', () => {
+                tpsViewMode = (tpsViewMode === 'raw') ? 'aggregated' : 'raw';
+                updateTpsUI(); // Re-render the table with the new mode
+            });
+            
             elements.uploadArea.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -1955,6 +2614,15 @@
             elements.advancedSection.classList.add('hidden');
             elements.advancedBtn.textContent = '⚙️ Advanced';
         }
+        function toggleTpsAdvancedSection() {
+    elements.tpsAdvancedSection.classList.toggle('hidden');
+    elements.tpsAdvancedBtn.textContent = elements.tpsAdvancedSection.classList.contains('hidden') ? '⚙️ Advanced' : '⚙️ Hide Advanced';
+}
+
+function hideTpsAdvancedSection() {
+    elements.tpsAdvancedSection.classList.add('hidden');
+    elements.tpsAdvancedBtn.textContent = '⚙️ Advanced';
+}
         function toggleAboutSection() {
             elements.aboutSection.classList.toggle('hidden');
             elements.aboutBtn.textContent = elements.aboutSection.classList.contains('hidden') ? 'ℹ️ About' : 'ℹ️ Hide About';
@@ -2031,23 +2699,36 @@
 
                 try {
                     parser = new GSIParser();
-                    parser.parse(e.target.result);
-                    
-                    if (parser.data.length === 0 && !parser.calibrationInfo.isCalibration) {
-                         showStatus('✗ No valid survey data found to process.', 'error');
-                         resetUI();
-                    } else {
-                        updateUI();
+                    parser.parse(e.target.result); // This will determine the fileType
+
+                    // --- MODE SWITCHER LOGIC ---
+                    if (parser.fileType === 'TPS') {
+                        displayTpsMode();
+                        updateTpsUI();
+                    } else if (parser.fileType === 'Levelling') {
+                        displayLevelingMode();
+                        if (parser.data.length === 0 && parser.calibrationInfo.isCalibration) {
+                            updateLevelingUI(); // Show empty tables but correct titles
+                            return; 
+                        }
+                        updateLevelingUI();
                         elements.reportBtn.click();
-                        // Update the upload area to show the loaded file name
-                        elements.uploadArea.innerHTML = `
-                            <div style="font-size: 36px; margin-bottom: 10px;">📄</div>
-                            <div><strong>File Loaded:</strong> ${escapeHtml(file.name)}</div>
-                            <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
-                                Drop or click to load a new file.
-                            </div>
-                        `;
+                    } else {
+                        // This case handles files that are not recognized as Leveling or TPS
+                        showStatus('✗ No valid GSI Leveling or TPS data found to process.', 'error');
+                        resetUI();
+                        return;
                     }
+
+                    // Update the upload area to show the loaded file name
+                    elements.uploadArea.innerHTML = `
+                        <div style="font-size: 36px; margin-bottom: 10px;">📄</div>
+                        <div><strong>File Loaded:</strong> ${escapeHtml(file.name)}</div>
+                        <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                            Drop or click to load a new file.
+                        </div>
+                    `;
+
                 } catch (error) {
                     resetUI();
                     showStatus(`✗ ${escapeHtml(error.message)}`, 'error');
@@ -2066,19 +2747,15 @@
         }
         
         function resetUI() {
-            
-            ['status', 'formatStatus', 'statsSection', 'actionsSection', 'previewSection', 'outputSection', 'advancedSection', 'analysisSection'].forEach(id => {
-                if (elements[id]) {
-                    elements[id].classList.add('hidden');
-                }
-            });
-
+    ['status', 'formatStatus', 'statsSection', 'tpsStatsSection', 'actionsSection', 'tpsActionsSection', 'previewSection', 'outputSection', 'advancedSection', 'analysisSection', 'tpsPreviewSection'].forEach(id => {
+        if (elements[id]) {
+            elements[id].classList.add('hidden');
+        }
+    });
             elements.dataTable.innerHTML = '';
-            elements.analysisTable.innerHTML = ''; // Also clear the analysis table content
+            elements.analysisTable.innerHTML = '';
             elements.fileInput.value = '';
             isFullView = false;
-            
-            // Restore original upload area content
             elements.uploadArea.innerHTML = `
                 <div style="font-size: 36px; margin-bottom: 10px;">📁</div>
                 <div>Drop GSI file here or click to select</div>
@@ -2100,14 +2777,15 @@
             elements.status.classList.remove('hidden');
         }
 
-        function updateUI() {
-            // Update stats
-            elements.recordCount.textContent = parser.stats.recordCount;
-            elements.pointCount.textContent = parser.stats.pointCount;
-            elements.methodType.textContent = parser.stats.method;
-            elements.heightRange.textContent = parser.stats.heightRange;
+       function updateLevelingUI() {
+            // --- Populate Harmonized Stats ---
+            const observationCount = parser.data.filter(r => ['backsight', 'foresight', 'intermediate'].includes(r.type)).length;
+            elements.statMethod.textContent = `LEVEL (${parser.stats.method})`;
+            elements.statSetups.textContent = parser.stats.setupCount;
+            elements.statObservations.textContent = observationCount;
+            elements.statPoints.textContent = parser.stats.pointCount;
 
-            // Update toggle button visibility and text
+            // Update toggle button visibility and text (logic is the same)
             if (parser.data.length > 20) {
                 elements.toggleViewBtn.style.display = 'inline-block';
                 let fullViewText = parser.data.length > MAX_PREVIEW_ROWS ? `first ${MAX_PREVIEW_ROWS}` : parser.data.length;
@@ -2115,11 +2793,9 @@
             } else {
                 elements.toggleViewBtn.style.display = 'none';
             }
-
-            // Determine which data to display in the main preview
             const dataToDisplay = isFullView ? parser.data.slice(0, MAX_PREVIEW_ROWS) : parser.data.slice(0, 20);
 
-            // Update main data table
+            // Update main data table (rest of function is the same)
             elements.dataTable.innerHTML = '';
             if (dataToDisplay.length === 0) {
                 const row = elements.dataTable.insertRow();
@@ -2132,12 +2808,13 @@
                     const row = document.createElement('tr');
                     const point = record.words['11']?.value || '';
                     const type = record.type;
-                    const reading = ['331', '332', '333', '330'].map(wi => record.words[wi]?.value.toFixed(5)).find(Boolean) || '';
-                    const distance = record.words['32'] ? record.words['32'].value.toFixed(3) : '';
-                    const height = record.words['83'] ? record.words['83'].value.toFixed(4) : '';
+                    let reading = '';
+                    const readingWord = ['331', '332', '333', '330'].map(wi => record.words[wi]).find(wordObj => wordObj && typeof wordObj.value === 'number');
+                    if (readingWord) reading = readingWord.value.toFixed(5);
+                    const distance = (record.words['32'] && typeof record.words['32'].value === 'number') ? record.words['32'].value.toFixed(3) : '';
+                    const height = (record.words['83'] && typeof record.words['83'].value === 'number') ? record.words['83'].value.toFixed(4) : '';
                     const setup = record.setupNumber || '';
-                    const calculatedRL = record.calculatedRL !== undefined ? record.calculatedRL.toFixed(4) : '';
-
+                    const calculatedRL = (record.calculatedRL !== undefined && typeof record.calculatedRL === 'number') ? record.calculatedRL.toFixed(4) : '';
                     row.innerHTML = `
                         <td>${escapeHtml(point)}</td>
                         <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
@@ -2150,10 +2827,8 @@
                     elements.dataTable.appendChild(row);
                 });
             }
-
-            // --- NEW: Populate Repeatability Analysis Table ---
             const analysisResults = parser.analyzePointRepeatability();
-            elements.analysisTable.innerHTML = ''; // Clear previous results
+            elements.analysisTable.innerHTML = ''; 
             if (analysisResults.length > 0) {
                 analysisResults.forEach(item => {
                     const row = document.createElement('tr');
@@ -2168,18 +2843,282 @@
                     `;
                     elements.analysisTable.appendChild(row);
                 });
-                elements.analysisSection.classList.remove('hidden'); // Show the section
+                elements.analysisSection.classList.remove('hidden');
             } else {
-                elements.analysisSection.classList.add('hidden'); // Hide if no repeated points
+                elements.analysisSection.classList.add('hidden');
             }
-
-
-            // Show main sections
-            elements.statsSection.classList.remove('hidden');
-            elements.actionsSection.classList.remove('hidden');
-            elements.previewSection.classList.remove('hidden');
         }
 
+        function updateTpsUI() {
+            elements.tpsViewToggleBtn.textContent = tpsViewMode === 'raw' ? 'Switch to Aggregated View' : 'Switch to Raw Log';
+
+            if (tpsViewMode === 'raw') {
+                // --- RAW VIEW LOGIC ---
+                const setupCount = parser.tpsSetups.length;
+                const observationCount = parser.tpsSetups.reduce((acc, setup) => acc + setup.observations.length, 0);
+                const pointCount = new Set(parser.tpsSetups.flatMap(s => s.observations.map(o => o.words['11']?.value)).filter(p => p)).size;
+                
+                // --- CORRECTED LINES START HERE ---
+                // Populate Unified Stats using the correct TPS element IDs
+                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatObservations.textContent = observationCount;
+                elements.tpsStatPoints.textContent = pointCount;
+                // --- CORRECTED LINES END HERE ---
+                
+                if (observationCount > 20 && elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'inline-block';
+                    elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
+                } else if (elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'none';
+                }
+                const rawObservations = parser.tpsSetups.flatMap(setup => setup.observations.map(obs => ({...obs, atStation: setup.stationName, instHt: setup.instrumentHeight })));
+                const dataToDisplay = tpsIsFullView ? rawObservations : rawObservations.slice(0, 20);
+
+                elements.tpsDataTable.innerHTML = '';
+                if (dataToDisplay.length === 0) {
+                    const row = elements.tpsDataTable.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 8;
+                    cell.textContent = "No measurement data found.";
+                    cell.style.textAlign = 'center';
+                } else {
+                    dataToDisplay.forEach(obs => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${escapeHtml(obs.atStation)}</td>
+                            <td><strong>${escapeHtml(obs.words['11']?.value || '')}</strong></td>
+                            <td>${escapeHtml(obs.face || 'N/A')}</td>
+                            <td class="numeric">${formatGsiAngle(obs.words['21']?.data)}</td>
+                            <td class="numeric">${formatGsiAngle(obs.words['22']?.data)}</td>
+                            <td class="numeric">${obs.words['31']?.value?.toFixed(3) || ''}</td>
+                            <td class="numeric">${obs.instHt?.toFixed(3) || ''}</td>
+                            <td class="numeric">${obs.words['87']?.value?.toFixed(3) || ''}</td>
+                        `;
+                        elements.tpsDataTable.appendChild(row);
+                    });
+                }
+            } else {
+                // --- AGGREGATED VIEW LOGIC ---
+                const finalObsCount = parser.finalTpsObservations.length;
+                const setupCount = new Set(parser.finalTpsObservations.map(o => o.atStation)).size;
+                const pointCount = new Set(parser.finalTpsObservations.map(o => o.toPoint)).size;
+                
+                // --- CORRECTED LINES START HERE ---
+                // Populate Unified Stats using the correct TPS element IDs
+                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatObservations.textContent = finalObsCount;
+                elements.tpsStatPoints.textContent = pointCount;
+                // --- CORRECTED LINES END HERE ---
+
+                if (finalObsCount > 20 && elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'inline-block';
+                    elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
+                } else if (elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'none';
+                }
+                const dataToDisplay = tpsIsFullView ? parser.finalTpsObservations : parser.finalTpsObservations.slice(0, 20);
+
+                elements.tpsDataTable.innerHTML = '';
+                if (dataToDisplay.length === 0) {
+                    const row = elements.tpsDataTable.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 8;
+                    cell.textContent = "No aggregated observations to display.";
+                    cell.style.textAlign = 'center';
+                } else {
+                    let obsCounter = 0;
+                    dataToDisplay.forEach(obs => {
+                        obsCounter++;
+                        const l1_detailsId = `l1-details-${obsCounter}`;
+                        let qaFlag = '';
+                        const faceIspreadFail = obs.faceData.faceI?.qa.spread.status === 'fail';
+                        const faceIIspreadFail = obs.faceData.faceII?.qa.spread.status === 'fail';
+                        const faceCompareFail = obs.faceData.faceI?.qa.face.status === 'fail';
+                        if (faceIspreadFail || faceIIspreadFail || faceCompareFail) {
+                            qaFlag = ` <span class="qa-fail" title="QA Check Failed: Expand for details">!</span>`;
+                        }
+                        const summaryRow = document.createElement('tr');
+                        summaryRow.innerHTML = `
+                            <td><span class="expander" data-target-id="${l1_detailsId}">+</span>${escapeHtml(obs.atStation)}</td>
+                            <td><strong>${escapeHtml(obs.toPoint)}</strong>${qaFlag}</td>
+                            <td>Face I & II</td>
+                            <td class="numeric">${formatDecimalDegrees(obs.meanHz)}</td>
+                            <td class="numeric">${formatDecimalDegrees(obs.meanV)}</td>
+                            <td class="numeric">${obs.meanSd.toFixed(3)}</td>
+                            <td class="numeric">${obs.instHt.toFixed(3)}</td>
+                            <td class="numeric">${obs.targetHeight.toFixed(3)}</td>
+                        `;
+                        const detailsRow = document.createElement('tr');
+                        detailsRow.className = 'details-row hidden';
+                        detailsRow.id = l1_detailsId;
+                        let l1_html = `<td colspan="8"><div class="details-container"><table>`;
+                        if (obs.faceData.faceI) {
+                            const faceI = obs.faceData.faceI;
+                            const l2_faceI_id = `l2-details-f1-${obsCounter}`;
+                            const qaSpreadFail = faceI.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                            l1_html += `
+                                <tr class="summary-row">
+                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceI_id}">+</span> ${escapeHtml(faceI.pointId)}${qaSpreadFail}</td>
+                                    <td style="width: 15%;">${faceI.face} (${faceI.count} obs)</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanHz)}</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanV)}</td>
+                                    <td class="numeric" style="width: 15%;">${faceI.meanSd.toFixed(3)}</td>
+                                    <td class="numeric" style="width: 15%;"></td>
+                                </tr>
+                                <tr id="${l2_faceI_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
+                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <tbody>
+                                        ${faceI.rawObservations.map(rawObs => `
+                                            <tr>
+                                                <td></td><td></td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
+                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
+                                                <td></td>
+                                            </tr>`).join('')}
+                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                            <strong>Spread Check:</strong>
+                                            Hz: ${faceI.qa.spread.values.hzRange?.toFixed(1)}" |
+                                            V: ${faceI.qa.spread.values.vaRange?.toFixed(1)}" |
+                                            SD: ${(faceI.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+                                            <strong style="float: right;">Status: ${faceI.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                        </td></tr>
+                                    </tbody>
+                                </table></div></td></tr>`;
+                        }
+                        if (obs.faceData.faceII) {
+                            const faceII = obs.faceData.faceII;
+                            const l2_faceII_id = `l2-details-f2-${obsCounter}`;
+                            const qaSpreadFail = faceII.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                             l1_html += `
+                                <tr class="summary-row">
+                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFail}</td>
+                                    <td style="width: 15%;">${faceII.face} (${faceII.count} obs)</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanHz)}</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanV)}</td>
+                                    <td class="numeric" style="width: 15%;">${faceII.meanSd.toFixed(3)}</td>
+                                    <td class="numeric" style="width: 15%;"></td>
+                                </tr>
+                                <tr id="${l2_faceII_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
+                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <tbody>
+                                        ${faceII.rawObservations.map(rawObs => `
+                                            <tr>
+                                                <td></td><td></td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
+                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
+                                                <td></td>
+                                            </tr>`).join('')}
+                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                            <strong>Spread Check:</strong>
+                                            Hz: ${faceII.qa.spread.values.hzRange?.toFixed(1)}" |
+                                            V: ${faceII.qa.spread.values.vaRange?.toFixed(1)}" |
+                                            SD: ${(faceII.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+                                            <strong style="float: right;">Status: ${faceII.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                        </td></tr>
+                                    </tbody>
+                                </table></div></td></tr>`;
+                        }
+                        if (obs.faceData.faceI && obs.faceData.faceII) {
+                            const faceCheck = obs.faceData.faceI.qa.face;
+                             l1_html += `
+                                <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                    <strong>Face Comparison:</strong>
+                                    Hz Diff: ${faceCheck.values.hzDiff?.toFixed(1)}" |
+                                    V Sum Diff (from 360°): ${faceCheck.values.vaDiff?.toFixed(1)}"
+                                    <strong style="float: right;">Status: ${faceCheck.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                </td></tr>`;
+                        }
+                        l1_html += '</table></div></td>';
+                        detailsRow.innerHTML = l1_html;
+                        elements.tpsDataTable.appendChild(summaryRow);
+                        elements.tpsDataTable.appendChild(detailsRow);
+                    });
+                }
+            }
+        }
+            
+            const setupCount = parser.tpsSetups.length;
+            // Observation count is now the number of foresights
+            const observationCount = parser.tpsSetups.reduce((acc, setup) => acc + setup.foresights.length, 0);
+            const points = new Set(parser.tpsSetups.flatMap(s => [
+                s.backsight?.words['11']?.value, 
+                ...s.foresights.map(o => o.words['11']?.value)
+            ].filter(p => p)));
+            
+            elements.tpsStatSetups.textContent = setupCount;
+            elements.tpsStatObservations.textContent = observationCount;
+            elements.tpsStatPoints.textContent = points.size;
+            elements.tpsStatMethod.textContent = 'Traverse (Inferred)';
+
+            // Populate TPS Data Table
+            elements.tpsDataTable.innerHTML = '';
+            if (observationCount === 0) {
+                const row = elements.tpsDataTable.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 9; // Updated colspan
+                cell.textContent = "No foresight measurement data found.";
+                cell.style.textAlign = 'center';
+            } else {
+                parser.tpsSetups.forEach(setup => {
+                    const atStation = setup.stationName;
+                    const fromPoint = setup.backsight ? (setup.backsight.words['11']?.value || '---') : '---';
+
+                    // Each foresight gets its own row in the table
+                    setup.foresights.forEach(obs => {
+                        const row = document.createElement('tr');
+                        const toPoint = obs.words['11']?.value || '';
+                        const hz = formatGsiAngle(obs.words['21']?.data);
+                        const vz = formatGsiAngle(obs.words['22']?.data);
+                        const sd = obs.words['31']?.value.toFixed(3) || '';
+                        const easting = obs.words['81']?.value.toFixed(3) || '';
+                        const northing = obs.words['82']?.value.toFixed(3) || '';
+                        const elevation = obs.words['83']?.value.toFixed(3) || '';
+
+                        row.innerHTML = `
+                            <td>${escapeHtml(atStation)}</td>
+                            <td>${escapeHtml(fromPoint)}</td>
+                            <td><strong>${escapeHtml(toPoint)}</strong></td>
+                            <td class="numeric">${hz}</td>
+                            <td class="numeric">${vz}</td>
+                            <td class="numeric">${sd}</td>
+                            <td class="numeric">${easting}</td>
+                            <td class="numeric">${northing}</td>
+                            <td class="numeric">${elevation}</td>
+                        `;
+                        elements.tpsDataTable.appendChild(row);
+                    });
+                });
+            }
+        
+
+        function displayLevelingMode() {
+            // Show all leveling-related sections, including the correct stats section
+            elements.statsSection.classList.remove('hidden');
+            elements.actionsSection.classList.remove('hidden'); // This is the levelling actions
+            elements.previewSection.classList.remove('hidden');
+
+    // Hide all TPS-related sections
+            elements.tpsStatsSection.classList.add('hidden');
+            elements.tpsActionsSection.classList.add('hidden'); // Hide TPS actions
+            elements.tpsPreviewSection.classList.add('hidden');
+}
+
+        function displayTpsMode() {
+    // Show all TPS-related sections, including the correct stats section
+    elements.tpsStatsSection.classList.remove('hidden');
+    elements.tpsActionsSection.classList.remove('hidden'); // Show TPS actions
+    elements.tpsPreviewSection.classList.remove('hidden');
+
+    // Hide all leveling-related sections
+    elements.statsSection.classList.add('hidden');
+    elements.previewSection.classList.add('hidden');
+    elements.analysisSection.classList.add('hidden');
+    elements.actionsSection.classList.add('hidden'); // Hide levelling actions
+}
         function showCalibrationOnly() {
             if (!parser || !parser.calibrationInfo.isCalibration) return;
             
@@ -2194,7 +3133,7 @@
                 parser.data = parser.fullData.filter(rec => rec.lineNumber >= startLine && rec.lineNumber <= endLine);
                 
                 parser.calculateStatsForCurrentData();
-                updateUI();
+                updateLevelingUI(); 
                 
                 showStatus(`Displaying ${parser.data.length} calibration records only.`, 'info');
                 
@@ -2218,7 +3157,7 @@
             if (!parser) return;
             // Re-run the analysis, which defaults to showing the main survey
             parser.processAndAnalyze();
-            updateUI();
+            updateLevelingUI(); 
             elements.outputSection.classList.add('hidden');
             elements.reportBtn.click();
         }
