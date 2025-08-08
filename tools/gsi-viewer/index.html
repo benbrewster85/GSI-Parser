@@ -1,0 +1,2728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - GSI Viewer</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+</head>
+<body>
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/tools/gsi-viewer/">GSI Viewer</a>
+                </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+    
+<div class="container">
+    <div class="local-header">
+        <div class="local-header-container">
+            <h2>GSI Viewer</h2>
+            <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+        </div>
+    </div>
+    <div class="section hidden" id="aboutSection">
+            <div class="section-title">
+                ℹ️ About GSI Viewer
+                <button class="btn" id="aboutToggle">Hide</button>
+            </div>
+            
+            <div class="advanced-content">
+                <div class="advanced-grid">
+                    <div class="advanced-group">
+                        <h4>Features</h4>
+                        <ul>
+                            <li>View Leica GSI format data with intelligent format detection.</li>
+                            <li>Automatically detect data type (level, TPS) and separate calibration tests.</li>
+                            <li>Aggregate readings for cleaner analysis.</li>
+                            <li>Export to multiple formats: Reports, StarNet, CSV.</li>
+                        </ul><br>
+
+                        <h4>Supported Formats</h4>
+                        <ul>
+                            <li><strong>.gsi</strong> - Standard GSI format files</li>
+                            <li><strong>.txt</strong> - Text-based GSI data</li>
+                           
+                        </ul>
+                    </div>
+                    
+                    <div class="advanced-group">
+                        <h4>How to Use</h4>
+                        <ol>
+                            <li>Upload your GSI file using drag & drop or file selection.</li>
+                            <li>Review the parsed data in the preview table.</li>
+                            <li>Configure advanced options if needed.</li>
+                            <li>Export your data in the desired format.</li>
+                        </ol><br>
+
+                        <h4>Technical Notes</h4>
+                        <p style="margin: 0;">This viewer is optimised for Leica GSI data and supports both GSI-8 and GSI-16 formats. Processing of GNSS and other forms of GSI and survey data are in development.</p><br>
+
+                        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+                            <strong>Version:</strong> 2025.1 • <strong>Created by:</strong> B Brewster
+                            <br>
+                            <strong>Contact:</strong> admin@surveytools.co.uk
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="upload-area" id="uploadArea" role="button" tabindex="0">
+                <div style="font-size: 36px; margin-bottom: 10px;">📁</div>
+                <div>Drop GSI file here or click to select</div>
+                <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                    Supports .gsi, .txt, and other level data formats
+                </div>
+                <input type="file" id="fileInput" class="file-input" accept=".gsi,.txt,.dat,.raw" aria-label="Select GSI file">
+            </div>
+            <div id="status" class="status hidden" role="alert"></div>
+            <div id="formatStatus" class="status hidden" role="status"></div>
+        </div>
+
+        <div class="section hidden" id="statsSection">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statMethod"> — </div>
+                    <div class="stat-label">Method</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statSetups">0</div>
+                    <div class="stat-label">Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statObservations">0</div>
+                    <div class="stat-label">Observations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statPoints">0</div>
+                    <div class="stat-label">Unique Points</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section hidden" id="tpsStatsSection">
+            <div class="stats">
+                 <div class="stat-card">
+                    <div class="stat-value" id="tpsStatMethod"> — </div>
+                    <div class="stat-label">Method</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatSetups">0</div>
+                    <div class="stat-label">Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatObservations">0</div>
+                    <div class="stat-label">Observations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatPoints">0</div>
+                    <div class="stat-label">Unique Points</div>
+                </div>
+            </div>
+        </div>
+
+
+
+        
+
+        <div class="section hidden" id="actionsSection">
+            <div class="actions">
+                <button class="btn" id="reportBtn">📄 Report</button>
+                <button class="btn" id="starnetBtn">⭐ StarNet</button>
+                <button class="btn" id="csvBtn">📊 CSV</button>
+                <button class="btn" id="advancedBtn">⚙️ Advanced</button>
+            </div>
+        </div>
+
+
+        <div class="section hidden" id="tpsActionsSection">
+    <div class="actions">
+        <button class="btn primary" id="tpsStarnetBtn">⭐ Export StarNet File</button>
+        <button class="btn" id="tpsAdvancedBtn">⚙️ Advanced</button>
+    </div>
+</div>
+        
+
+        <div class="section hidden" id="tpsAdvancedSection">
+            <div class="section-title">
+                ⚙️ Advanced Processing Options
+                <button class="btn" id="tpsAdvancedToggle">Hide</button>
+            </div>
+
+    <div class="advanced-content">
+        <div class="advanced-grid">
+            <div class="advanced-group">
+                <h4>StarNet Export Options</h4>
+                <p class="help-text">Choose the data to be exported to the StarNet file.</p>
+                <div style="margin-bottom: 15px;">
+                    <label class="checkbox-label">
+                        <input type="radio" name="tpsExportMode" value="meaned" checked>
+                        <span>Meaned Observations (Recommended)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="radio" name="tpsExportMode" value="raw">
+                        <span>Raw Observations</span>
+                    </label>
+                </div>
+
+                <h4 style="margin-top: 20px;">QA Tolerances</h4>
+                <p class="help-text">Define acceptance criteria for QA checks. Spreads are checked within a single face; Face differences are checked between Face I and Face II.</p>
+                 <label class="form-label" for="qaHzSpread">Internal Hz Spread (arc-seconds)</label>
+                <input type="number" id="qaHzSpread" value="5" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaVaSpread">Internal V Spread (arc-seconds)</label>
+                <input type="number" id="qaVaSpread" value="10" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaSdSpread">Internal SD Spread (metres)</label>
+                <input type="number" id="qaSdSpread" value="0.003" step="0.001" class="form-input" style="margin-bottom: 10px;">
+
+            </div>
+
+            <div class="advanced-group">
+                <h4>Face Comparison Tolerances</h4>
+                <p class="help-text">Define acceptance criteria for Face I vs Face II comparisons.</p>
+                <label class="form-label" for="qaFaceHz">Face Hz Difference (arc-seconds)</label>
+                <input type="number" id="qaFaceHz" value="10" class="form-input" style="margin-bottom: 10px;">
+
+                <label class="form-label" for="qaFaceVa">Face V Difference (arc-seconds)</label>
+                <input type="number" id="qaFaceVa" value="15" class="form-input" style="margin-bottom: 10px;">
+
+                <button class="btn primary" id="applyTpsAdvanced" style="margin-top: 25px;">
+                    <span id="applyTpsText">Apply & Reprocess</span>
+                    <div id="applyTpsSpinner" class="loading-spinner hidden" style="display: none;"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<div class="section hidden" id="advancedSection">
+    <div class="section-title">
+        ⚙️ Advanced TPS Options
+        <button class="btn" id="advancedToggle">Hide</button>
+    </div>
+            
+            <div class="advanced-content">
+                <div class="advanced-grid">
+                    <div class="advanced-group">
+                        <h4>Change Point Processing</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="aggregateCP" checked>
+                            <span>Aggregate change point readings</span>
+                        </label>
+                        <p class="help-text">
+                            Groups readings between named stations through change points
+                        </p>
+                        
+                        <label class="form-label">Change Point Detection Method:</label>
+                        <div style="margin-bottom: 15px;">
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="prefix" checked>
+                                <span>Text Prefix (e.g., CP, TP, TBM)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="numeric">
+                                <span>Numeric Only (1, 2, 3, 4...)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="changePointMethod" value="both">
+                                <span>Both Methods</span>
+                            </label>
+                        </div>
+                        
+                        <div id="prefixSettings">
+                            <label class="form-label" for="changePointPrefix">Change Point Prefix:</label>
+                            <input type="text" id="changePointPrefix" value="CP" placeholder="e.g., CP, TP, TBM" class="form-input">
+                        </div>
+                        
+                        <div id="numericSettings" style="display: none;">
+                            <label class="form-label">Numeric Range:</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" id="numericMin" value="1" min="0" max="999" class="form-input" style="width: 80px;" placeholder="Min">
+                                <span>to</span>
+                                <input type="number" id="numericMax" value="999" min="1" max="9999" class="form-input" style="width: 80px;" placeholder="Max">
+                            </div>
+                            <p class="help-text">
+                                Point names that are purely numeric within this range will be treated as change points
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="advanced-group">
+                        <h4>Output Options</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="includeTurnCount">
+                            <span>Include turn count in reports</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="showCPDetails">
+                            <span>Show change point details</span>
+                        </label>
+                         <label class="checkbox-label" style="margin-top: 15px;">
+                            <input type="checkbox" id="retainCalibration">
+                            <span>Retain calibration data in main survey</span>
+                        </label>
+                        <p class="help-text">
+                            If unchecked, detected 2-peg tests will be automatically excluded from results.
+                        </p>
+                        
+                        <button class="btn primary" id="applyAdvanced" style="margin-top: 10px;">
+                            <span id="applyText">Apply & Reprocess</span>
+                            <div id="applySpinner" class="loading-spinner hidden" style="display: none;"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="previewSection">
+            <div class="data-table">
+                <div class="table-header">
+                    Data Preview
+                    <button class="btn" id="toggleViewBtn" style="padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
+                </div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Point</th>
+                                <th>Type</th>
+                                <th>Reading</th>
+                                <th>Distance</th>
+                                <th>Height</th>
+                                <th>Calculated RL</th>
+                                <th>Setup</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="analysisSection">
+            <div class="data-table">
+                <div class="table-header">Point Repeatability Analysis</div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Point ID</th>
+                                <th>Count</th>
+                                <th>Min RL (m)</th>
+                                <th>Max RL (m)</th>
+                                <th>Spread (mm)</th>
+                                <th>Average RL (m)</th>
+                                <th>Observed RLs (m)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="tpsPreviewSection">
+    <div class="data-table">
+        <div class="table-header">
+            <span>TPS Observation Summary</span>
+            <div>
+                <button class="btn" id="tpsViewToggleBtn" style="padding: 5px 10px; font-size: 12px; margin-right: 10px;">Switch to Aggregated View</button>
+                <button class="btn" id="tpsShowAllBtn" style="padding: 5px 10px; font-size: 12px; display: none;">Show All</button>
+            </div>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>At (Station)</th>
+                        <th>To (Point ID)</th>
+                        <th>Face</th>
+                        <th class="numeric">Hz Angle</th>
+                        <th class="numeric">V Angle</th>
+                        <th class="numeric">Slope Dist</th>
+                        <th class="numeric">Inst. Ht</th>
+                        <th class="numeric">Tgt. Ht</th>
+                    </tr>
+                </thead>
+                <tbody id="tpsDataTable"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+        
+
+        <div class="section hidden" id="outputSection">
+            <div class="output" id="outputArea"></div>
+            <div>
+                <button class="btn" id="downloadBtn">💾 Download</button>
+                <button class="btn" id="copyBtn">📋 Copy</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Created by B Brewster • © 2025
+        </div>
+    </div>
+
+    
+    
+    <script>
+        'use strict';
+
+        // Security constants
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+        const MAX_RECORDS = 500000;
+        const MAX_LINE_LENGTH = 1000;
+        const PROCESSING_TIMEOUT = 60000;
+        const MAX_PREVIEW_ROWS = 1000; // Safety limit for "Show All"
+
+        class GSIParser {
+            constructor() {
+                this.rawData = '';
+                this.data = [];
+                this.fullData = []; // Store the original full data set
+                this.stats = {};
+                this.levelRuns = [];
+                this.aggregatedRuns = [];
+                this.calibrationInfo = {};
+                this.fileType = 'unknown'; 
+                this.tpsSetups = [];
+                this.reducedTpsSetups = []; 
+                this.finalTpsObservations = [];
+                this.qaTolerances = {
+                    hzSpread: 5, // in seconds
+                    vaSpread: 10, // in seconds
+                    sdSpread: 0.003, // in meters
+                    faceHz: 10, // in seconds
+                    faceVa: 15  // in seconds
+                };
+                this.processingOptions = {
+                    aggregateCP: true,
+                    changePointPrefix: 'CP',
+                    changePointMethod: 'prefix',
+                    numericMin: 1,
+                    numericMax: 999,
+                    includeTurnCount: false,
+                    showCPDetails: false,
+                    retainCalibrationData: false,
+                    tpsExportMode: 'meaned'
+                };
+            }
+
+            parse(text) {
+                if (text.length > MAX_FILE_SIZE) {
+                    throw new Error('File too large. Maximum size is 50MB.');
+                }
+
+                this.rawData = text;
+                this.data = []; // Reset data
+                const lines = text.split('\n');
+                
+                if (lines.length > MAX_RECORDS) {
+                    throw new Error(`Too many lines. Maximum ${MAX_RECORDS} lines allowed.`);
+                }
+                
+                // Perform a preliminary format check on the raw lines
+                const formatAnalysis = this.analyzeGSIFormat(lines);
+                this.fileType = formatAnalysis.formatType; // Save the detected file type
+
+                // --- VALIDATION GATE ---
+                if (formatAnalysis.errors.length > 0) {
+                    throw new Error(formatAnalysis.errors.join('\n'));
+                }
+                // We no longer throw an error for TPS files, we just handle them differently.
+                
+                // If the file is valid, display any non-fatal warnings
+                this.displayFormatWarnings(formatAnalysis);
+                
+                let processedRecords = 0;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    if (line.length > MAX_LINE_LENGTH) {
+                        console.warn(`Skipping excessively long line ${i + 1}`);
+                        continue;
+                    }
+                    
+                    if (processedRecords >= MAX_RECORDS) {
+                        console.warn(`Reached maximum record limit of ${MAX_RECORDS}`);
+                        break;
+                    }
+                    
+                    const record = this.parseLine(line);
+                    if (record) {
+                        record.lineNumber = i + 1;
+                        this.data.push(record);
+                        processedRecords++;
+                    }
+                }
+                
+                this.fullData = [...this.data]; // Keep a copy of the full dataset
+                this.processAndAnalyze(); // Separate calibration/setups and calculate stats
+                
+                return this.data;
+            }
+            
+            processAndAnalyze() {
+                if (this.fileType === 'TPS') {
+                    // --- TPS LOGIC PATH ---
+                    this.buildTpsSetups();
+                    this.reduceTpsSetups(); // Step 1: Group by Face
+                    this.meanFaceObservations(); // Step 2: Average the Faces
+                    
+                    // Log the final, fully reduced data structure to the console for verification.
+                    console.log("Final TPS Observations:", this.finalTpsObservations);
+                    showStatus(`✓ Parsed and fully processed ${this.fullData.length} TPS records.`, 'success');
+
+                } else if (this.fileType === 'Levelling') {
+                    // --- LEVELLING LOGIC PATH (Existing Stable Logic) ---
+                    const allRuns = this.buildLevelRuns(this.fullData);
+                    this.calibrationInfo = this.identifyCalibrationData(allRuns);
+                    this.data = [...this.fullData];
+
+                    if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
+                        this.displayCalibrationWarning(this.calibrationInfo);
+                        const endLineMatch = this.calibrationInfo.recordRange.match(/to\s(\d+)/);
+                        if (endLineMatch && endLineMatch[1]) {
+                            const endLine = parseInt(endLineMatch[1]);
+                            const calibrationEndIndex = this.fullData.findIndex(rec => rec.lineNumber === endLine);
+                            if (calibrationEndIndex !== -1) {
+                                const mainDataStartIndex = this.fullData.findIndex((rec, index) => index > calibrationEndIndex && rec.words['83']);
+                                if (mainDataStartIndex !== -1) {
+                                    this.data = this.fullData.slice(mainDataStartIndex);
+                                    showStatus(`✓ Parsed ${this.fullData.length} Level records. Calibration test excluded. Processing ${this.data.length} main survey records.`, 'success');
+                                } else {
+                                    this.data = []; 
+                                    showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test found, but no subsequent survey data detected.`, 'warning');
+                                }
+                            }
+                        }
+                    } else {
+                        if (this.calibrationInfo.isCalibration) { 
+                             this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
+                        } else { 
+                             document.getElementById('formatStatus').classList.add('hidden');
+                        }
+                        showStatus(`✓ Parsed ${this.fullData.length} level records successfully.`, 'success');
+                    }
+                    this.calculateStatsForCurrentData();
+                }
+            }
+
+            calculateStatsForCurrentData() {
+                // Build runs from the current data (which may be filtered)
+                this.levelRuns = this.buildLevelRuns(this.data); 
+                
+                // Calculate reduced levels based on these runs
+                this.calculateReducedLevels();
+                
+                // Aggregate change points
+                this.aggregatedRuns = this.aggregateChangePointRuns();
+                
+                // Gather statistics
+                const points = new Set();
+                const heights = [];
+                this.data.forEach(record => {
+                    if (record.words['11']) {
+                        points.add(record.words['11'].value);
+                    }
+                    if (record.words['83']) {
+                        heights.push(record.words['83'].value);
+                    }
+                });
+                
+                this.stats = {
+                    recordCount: this.data.length,
+                    pointCount: points.size,
+                    setupCount: this.levelRuns.length,
+                    uniquePoints: Array.from(points),
+                    heightRange: heights.length > 0 ? 
+                        `${Math.min(...heights).toFixed(3)}m - ${Math.max(...heights).toFixed(3)}m` : '—',
+                    method: this.detectMethod()
+                };
+            }
+
+            analyzeGSIFormat(lines) {
+                const analysis = {
+                    totalLines: lines.length,
+                    validGSILines: 0,
+                    invalidLines: [],
+                    formatType: 'unknown',
+                    isTPS: false,
+                    hasLevelingData: false,
+                    hasCoordinateData: false,
+                    wordCounts: {},
+                    errors: [],
+                    warnings: []
+                };
+
+                const maxSampleSize = Math.min(50, lines.length);
+
+                for (let i = 0; i < maxSampleSize; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const lineAnalysis = this.analyzeGSILine(line, i + 1);
+                    if (lineAnalysis.isValid) {
+                        analysis.validGSILines++;
+                        lineAnalysis.wordIds.forEach(wi => {
+                            analysis.wordCounts[wi] = (analysis.wordCounts[wi] || 0) + 1;
+                        });
+                        if (lineAnalysis.hasLevelingWords) analysis.hasLevelingData = true;
+                        if (lineAnalysis.hasCoordinateWords) analysis.hasCoordinateData = true;
+                    } else {
+                        analysis.invalidLines.push({
+                            lineNumber: i + 1,
+                            content: line.substring(0, 100) + (line.length > 100 ? '...' : ''),
+                            issues: lineAnalysis.issues
+                        });
+                    }
+                }
+                this.determineGSIFormat(analysis);
+                return analysis;
+            }
+
+            analyzeGSILine(line, lineNumber) {
+                const result = { isValid: false, wordIds: [], hasLevelingWords: false, hasCoordinateWords: false, issues: [] };
+                const words = line.split(/\s+/);
+                if (words.length === 0) {
+                    result.issues.push('Empty line');
+                    return result;
+                }
+                let validWords = 0;
+                const levelingWIs = ['331', '332', '333', '330'];
+                const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
+
+                for (const word of words) {
+                    if (word.length < 8) {
+                        result.issues.push(`Word too short: ${word}`);
+                        continue;
+                    }
+                    let wi, isValidStructure = false;
+                    if (word.startsWith('*')) {
+                        wi = word.substring(1, 3);
+                        isValidStructure = /^\*\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
+                    } else {
+                        const first3 = word.substring(0, 3);
+                        const fourth = word.substring(3, 4);
+                        if (!isNaN(first3) && fourth === '.' && first3.length === 3 && parseInt(first3) >= 330 && parseInt(first3) <= 399) {
+                            wi = first3;
+                            isValidStructure = /^\d{3}\.[\d\.]{2}[+\-]\d+$/.test(word);
+                        } else {
+                            wi = word.substring(0, 2);
+                            isValidStructure = /^\d{2}[\d\.]{4}[+\-]\d+$/.test(word);
+                        }
+                    }
+                    if (isValidStructure && !isNaN(parseInt(wi))) {
+                        validWords++;
+                        result.wordIds.push(wi);
+                        if (levelingWIs.includes(wi)) result.hasLevelingWords = true;
+                        if (coordinateWIs.includes(wi)) result.hasCoordinateWords = true;
+                    } else {
+                        result.issues.push(`Invalid GSI word structure: ${word.substring(0, 20)}`);
+                    }
+                }
+                result.isValid = validWords > 0;
+                return result;
+            }
+
+            determineGSIFormat(analysis) {
+                const tpsIndicators = ['16', '17', '18', '19', '58', '59', '71', '72', '73', '74', '75', '76'];
+                const coordinateWIs = ['81', '82', '83', '84', '85', '86', '87', '88'];
+                const levelingWIs = ['331', '332', '333', '330'];
+                const hasTpsWords = tpsIndicators.some(wi => analysis.wordCounts[wi] > 0);
+                const hasCoordinates = coordinateWIs.some(wi => analysis.wordCounts[wi] > 0);
+                const hasLeveling = levelingWIs.some(wi => analysis.wordCounts[wi] > 0);
+
+                if (hasTpsWords || (hasCoordinates && !hasLeveling)) {
+                    analysis.isTPS = true;
+                    analysis.formatType = 'TPS';
+                } else if (hasLeveling) {
+                    analysis.formatType = 'Levelling';
+                } else if (hasCoordinates) {
+                    analysis.formatType = 'Coordinate';
+                    analysis.warnings.push('⚠️ Coordinate data detected - Limited support for non-levelling GSI');
+                }
+                const validLineRatio = analysis.validGSILines / Math.max(1, analysis.totalLines - this.countEmptyLines(analysis));
+                if (validLineRatio < 0.7) {
+                    analysis.errors.push(`❌ Poor GSI format: Only ${Math.round(validLineRatio * 100)}% of lines are valid GSI format`);
+                }
+                if (analysis.validGSILines === 0) {
+                    analysis.errors.push('❌ No valid GSI data found - Check file format');
+                }
+                if (analysis.wordCounts['11'] === 0) {
+                    analysis.warnings.push('⚠️ No point IDs (WI 11) found');
+                }
+                if (Object.keys(analysis.wordCounts).length < 3) {
+                    analysis.warnings.push('⚠️ Very limited GSI word types detected');
+                }
+            }
+
+            countEmptyLines(analysis) {
+                return analysis.totalLines - analysis.validGSILines - analysis.invalidLines.length;
+            }
+
+            displayFormatWarnings(analysis) {
+                const messages = [];
+                if (analysis.formatType !== 'unknown') {
+                    messages.push(`📋 GSI Format: ${analysis.formatType}`);
+                }
+                analysis.errors.forEach(error => messages.push(error));
+                analysis.warnings.forEach(warning => messages.push(warning));
+                if (analysis.invalidLines.length > 0) {
+                    const exampleCount = Math.min(3, analysis.invalidLines.length);
+                    if (analysis.invalidLines.length > exampleCount) {
+                        messages.push(`... and ${analysis.invalidLines.length - exampleCount} more formatting issues`);
+                    }
+                }
+                if (messages.length > 0) {
+                    const messageText = messages.join('\n');
+                    let messageType = 'success';
+                    if (analysis.errors.length > 0) messageType = 'error';
+                    else if (analysis.warnings.length > 0 || analysis.isTPS) messageType = 'warning';
+                    this.showFormatStatus(messageText, messageType);
+                }
+            }
+
+            showFormatStatus(message, type) {
+                let formatStatus = document.getElementById('formatStatus');
+                formatStatus.innerHTML = ''; 
+                const textContainer = document.createElement('div');
+                textContainer.innerText = message;
+                formatStatus.appendChild(textContainer);
+                formatStatus.className = 'status ' + type;
+                formatStatus.classList.remove('hidden');
+                formatStatus.style.whiteSpace = 'pre-line';
+                formatStatus.style.marginTop = '10px';
+                formatStatus.style.fontSize = '13px';
+            }
+
+            updateProcessingOptions(options) {
+                this.processingOptions = { ...this.processingOptions, ...options };
+                this.processAndAnalyze(); 
+                return this.data;
+            }
+
+            parseLine(line) {
+                const words = line.split(/\s+/);
+                const record = { words: {}, type: 'unknown' };
+                for (const word of words) {
+                    const parsed = this.parseWord(word, this.fileType);
+                    if (parsed) {
+                        record.words[parsed.wi] = parsed;
+                    }
+                }
+                if (record.words['331']) record.type = 'backsight';
+                else if (record.words['332']) record.type = 'foresight';
+                else if (record.words['333']) record.type = 'intermediate';
+                else if (record.words['330']) record.type = 'measure_only';
+                return Object.keys(record.words).length > 0 ? record : null;
+            }
+
+            parseWord(word, fileType) {
+                if (word.length < 8) return null;
+                let wi, info, sign, data;
+
+                if (fileType === 'TPS') {
+                    // --- CORRECTED TPS LOGIC ---
+                    // It now handles words with or without a leading asterisk.
+                    let wordToParse = word;
+                    if (word.startsWith('*')) {
+                        wordToParse = word.substring(1); // Remove asterisk for consistent parsing
+                    }
+
+                    wi = wordToParse.substring(0, 2);
+                    info = wordToParse.substring(2, 6);
+                    sign = wordToParse.substring(6, 7);
+                    data = wordToParse.substring(7);
+
+                } else {
+                    // --- ORIGINAL, STABLE LEVELING LOGIC ---
+                    if (word.startsWith('*')) {
+                        // GSI-8 leveling logic
+                        wi = word.substring(1, 3);
+                        info = word.substring(3, 7);
+                        sign = word.substring(7, 8);
+                        data = word.substring(8);
+                    } else {
+                        // GSI-16 leveling logic
+                        const first3 = word.substring(0, 3);
+                        const fourth = word.substring(3, 4);
+                        if (!isNaN(first3) && fourth === '.' && first3.length === 3 &&
+                            parseInt(first3) >= 330 && parseInt(first3) <= 399) {
+                            wi = first3;
+                            info = word.substring(3, 6);
+                            sign = word.substring(6, 7);
+                            data = word.substring(7);
+                        } else {
+                            wi = word.substring(0, 2);
+                            info = word.substring(2, 6);
+                            sign = word.substring(6, 7);
+                            data = word.substring(7);
+                        }
+                    }
+                }
+                
+                // --- Common logic for both types ---
+                if (!wi || (sign !== '+' && sign !== '-')) return null;
+                if (isNaN(parseInt(wi))) return null;
+                
+                const value = this.interpretValue(wi, sign + data, info);
+                return { wi, info, sign, data, value };
+            }
+
+            interpretValue(wi, valueStr, info) {
+                // A list of Word IDs that are known to contain text/string data
+                const stringTypeWIs = ['11', '41', '42', '44']; 
+                
+                if (stringTypeWIs.includes(wi)) {
+                    // If the Word ID is in our list, treat it as text.
+                    // This removes the leading +/- sign and any padding zeros.
+                    return valueStr.substring(1).replace(/^0+/, '');
+                }
+
+                // For all other Word IDs, process them as numbers.
+                // This handles both TPS coordinates (with decimals) and leveling data (scaled integers).
+                
+                if (valueStr.includes('.')) {
+                    const num = parseFloat(valueStr);
+                    return isNaN(num) ? 0 : num;
+                }
+
+                const num = parseInt(valueStr, 10);
+                if (isNaN(num)) {
+                    return 0;
+                }
+
+                // Handle non-scaled integers like measurement counts
+                if (['390', '391', '392'].includes(wi)) {
+                    return num;
+                }
+
+                // Apply standard GSI scaling for leveling data
+                const pos6 = info.charAt(info.length - 1);
+                let scale = 1000;
+                if (pos6 === '6') scale = 10000;
+                else if (pos6 === '8') scale = 100000;
+                
+                return num / scale;
+            }
+            
+            detectMethod() {
+                // 1. Check for the explicit method code in the full, original dataset first. This is the most reliable source.
+                const methodRecord = this.fullData.find(r => r.words['41'] && r.words['41'].data.includes('?'));
+                if (methodRecord) {
+                    const code = methodRecord.words['41'].data;
+                    if (code.includes('1')) return 'BF';
+                    if (code.includes('2')) return 'BFFB';
+                    return 'Unknown'; // Code found but not recognized
+                }
+
+                // 2. If no code is found, infer from the structure of the main level runs.
+                if (!this.levelRuns || this.levelRuns.length === 0) {
+                    return '—'; // Not enough data to make a determination
+                }
+
+                // Get an array of foresight counts for each setup that has at least one foresight.
+                const foresightCounts = this.levelRuns
+                    .map(run => run.foresights.length)
+                    .filter(count => count > 0);
+                
+                if (foresightCounts.length === 0) {
+                    return '—'; // No complete setups found in the main run
+                }
+
+                // Check for consistent patterns
+                const allAreBF = foresightCounts.every(count => count === 1);
+                if (allAreBF) {
+                    return 'BF (Inferred)';
+                }
+
+                const allAreBFFB = foresightCounts.every(count => count === 2);
+                if (allAreBFFB) {
+                    return 'BFFB (Inferred)';
+                }
+
+                return 'Mixed/Unknown'; // If patterns are inconsistent, we can't be sure
+            }
+
+            identifyCalibrationData(runsForDetection) {
+                const result = { isCalibration: false, type: null, confidence: 0, issues: [], recordRange: null };
+
+                // --- NEW PRIMARY METHOD: Detect by WI 41 ---
+                // The WI 41 block is the definitive start of a measured line. Anything before it is setup/calibration.
+                const methodCodeRecord = this.fullData.find(r => r.words['41'] && r.words['41'].data.includes('?'));
+                if (methodCodeRecord) {
+                    const firstRecord = this.fullData[0];
+                    // If the method code is not the very first line, flag everything before it.
+                    if (methodCodeRecord.lineNumber > firstRecord.lineNumber) {
+                        result.isCalibration = true;
+                        result.type = 'Instrument Setup / Calibration';
+                        result.confidence = 100; // This is a definitive, not heuristic, check.
+                        result.recordRange = `Records ${firstRecord.lineNumber} to ${methodCodeRecord.lineNumber - 1}`;
+                        result.issues.push(`Data preceding the Method Code (WI 41) on line ${methodCodeRecord.lineNumber} has been isolated.`);
+                        return result;
+                    }
+                }
+                // --- END NEW METHOD ---
+
+
+                // --- FALLBACK METHOD: Heuristic Pattern Recognition (Original Logic) ---
+                const points = new Set(this.fullData.map(r => r.words['11']?.value).filter(Boolean));
+                const uniquePoints = Array.from(points);
+
+                const earlyRecords = this.fullData.slice(0, 10);
+                const early2PegCheck = this.checkEarly2PegPattern(earlyRecords);
+                if (early2PegCheck.is2Peg) {
+                    result.isCalibration = true;
+                    result.type = '2-peg-test';
+                    result.confidence = early2PegCheck.confidence;
+                    result.issues = early2PegCheck.issues;
+                    result.recordRange = early2PegCheck.recordRange;
+                    return result;
+                }
+                
+                if (runsForDetection.length > 5 || uniquePoints.length > 8) {
+                    return result; // Not a small calibration file, so exit.
+                }
+                
+                let confidenceScore = 0;
+                const calibrationNames = uniquePoints.filter(p => /^(PEG|PG|A|B|TEST|CAL|2PEG|TP[12])$/i.test(p) || /^[AB][12]?$/i.test(p));
+                if (calibrationNames.length >= 2) {
+                    confidenceScore += 30;
+                    result.issues.push(`Calibration-style names detected: ${calibrationNames.join(', ')}`);
+                }
+                if (uniquePoints.length === 2 && runsForDetection.length >= 2 && runsForDetection.length <= 3) {
+                    confidenceScore += 25;
+                    result.issues.push('Classic 2-peg pattern: 2 points, 2-3 setups');
+                }
+                const repeatedPattern = this.checkRepeatedPointPattern(runsForDetection);
+                if (repeatedPattern.hasRepeated) {
+                    confidenceScore += 20;
+                    result.issues.push(`Points observed multiple times: ${repeatedPattern.repeatedPoints.join(', ')}`);
+                }
+                if (this.fullData.length <= 10 && uniquePoints.length <= 4) {
+                    confidenceScore += 10;
+                    result.issues.push('Limited data set typical of calibration');
+                }
+                
+                if (confidenceScore >= 40) {
+                    result.isCalibration = true;
+                    result.type = confidenceScore >= 60 ? '2-peg-test' : 'possible-calibration';
+                    result.confidence = Math.min(confidenceScore, 100);
+                    if (!result.recordRange && runsForDetection.length > 0) {
+                        const firstLine = runsForDetection[0].backsight.lineNumber;
+                        const lastRun = runsForDetection[runsForDetection.length - 1];
+                        const lastLine = lastRun.foresights.length > 0 ? lastRun.foresights.slice(-1)[0].lineNumber : lastRun.backsight.lineNumber;
+                        result.recordRange = `Lines ${firstLine} to ${lastLine}`;
+                    }
+                }
+                
+                return result;
+            }
+
+            checkRepeatedPointPattern(runsForDetection) {
+                const pointObservations = {};
+                const result = { hasRepeated: false, repeatedPoints: [] };
+                
+                runsForDetection.forEach(run => {
+                    const bsPoint = run.backsight.words['11']?.value;
+                    if (bsPoint) pointObservations[bsPoint] = (pointObservations[bsPoint] || 0) + 1;
+                    run.foresights.forEach(fs => {
+                        const fsPoint = fs.words['11']?.value;
+                        if (fsPoint) pointObservations[fsPoint] = (pointObservations[fsPoint] || 0) + 1;
+                    });
+                });
+                
+                Object.entries(pointObservations).forEach(([point, count]) => {
+                    if (count > 2) {
+                        result.hasRepeated = true;
+                        result.repeatedPoints.push(`${point}(${count}x)`);
+                    }
+                });
+                
+                return result;
+            }
+
+            checkDistancePattern() {
+                const result = { isTypical2PegDistance: false, distance: 0 };
+                const coordinatePoints = this.fullData.filter(record => 
+                    record.words['11'] && record.words['81'] && record.words['82']
+                ).map(record => ({ name: record.words['11'].value, x: record.words['81'].value, y: record.words['82'].value }));
+                
+                if (coordinatePoints.length >= 2) {
+                    const p1 = coordinatePoints[0];
+                    const p2 = coordinatePoints[1];
+                    const distance = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+                    result.distance = distance;
+                    if (distance >= 40 && distance <= 80) result.isTypical2PegDistance = true;
+                }
+                return result;
+            }
+
+            displayCalibrationWarning(calibrationInfo) {
+                const messages = [];
+                messages.push(`🔶 ${calibrationInfo.type.toUpperCase()} DETECTED (${calibrationInfo.confidence}% confidence).`);
+                if (calibrationInfo.recordRange) {
+                    messages.push(`📍 Located in ${calibrationInfo.recordRange}. These records will be excluded by default.`);
+                }
+                messages.push('\nIssues found:');
+                calibrationInfo.issues.forEach(issue => {
+                    messages.push(`• ${issue}`);
+                });
+                
+                const messageText = messages.join('\n');
+                this.showFormatStatus(messageText, 'warning');
+
+                const formatStatusEl = document.getElementById('formatStatus');
+                
+                const oldActions = formatStatusEl.querySelector('#calibration-actions');
+                if(oldActions) oldActions.remove();
+
+                const actionsContainer = document.createElement('div');
+                actionsContainer.style.marginTop = '10px';
+                actionsContainer.id = 'calibration-actions';
+
+                const showCalibBtn = document.createElement('button');
+                showCalibBtn.textContent = '🔍 View Calibration Test Only';
+                showCalibBtn.className = 'btn status-action';
+                showCalibBtn.onclick = () => showCalibrationOnly(); 
+                
+                const showMainBtn = document.createElement('button');
+                showMainBtn.textContent = '📋 View Main Survey Only';
+                showMainBtn.className = 'btn status-action';
+                showMainBtn.onclick = () => showMainSurveyOnly();
+
+                actionsContainer.appendChild(showCalibBtn);
+                actionsContainer.appendChild(showMainBtn);
+                formatStatusEl.appendChild(actionsContainer);
+            }
+
+            buildLevelRuns(dataToProcess) {
+                const runs = [];
+                let currentRun = null;
+                let setupNumber = 0;
+                
+                dataToProcess.forEach(record => {
+                    if (record.type === 'backsight') {
+                        if (currentRun) runs.push(currentRun);
+                        setupNumber++;
+                        currentRun = {
+                            setupNumber: setupNumber,
+                            backsight: record,
+                            foresights: [],
+                            intermediates: []
+                        };
+                        record.setupNumber = setupNumber;
+                    } else if (currentRun) {
+                        record.setupNumber = setupNumber;
+                        if (record.type === 'foresight') currentRun.foresights.push(record);
+                        else if (record.type === 'intermediate') currentRun.intermediates.push(record);
+                    }
+                });
+                if (currentRun) runs.push(currentRun);
+                
+                runs.forEach((run, index) => {
+                    const newSetupNum = index + 1;
+                    run.setupNumber = newSetupNum;
+                    run.backsight.setupNumber = newSetupNum;
+                    run.foresights.forEach(r => r.setupNumber = newSetupNum);
+                    run.intermediates.forEach(r => r.setupNumber = newSetupNum);
+                });
+                
+                return runs;
+            }
+
+            buildTpsSetups() {
+                const setups = [];
+                let currentSetup = null;
+
+                this.fullData.forEach(record => {
+                    // A new instrument setup is defined by a Code Block (WI 41)
+                    if (record.words['41']) {
+                        currentSetup = {
+                            setupNumber: setups.length + 1,
+                            stationName: record.words['42']?.value || `STN${setups.length + 1}`,
+                            instrumentHeight: record.words['43']?.value || 0,
+                            observations: [], // A single, simple array for all observations
+                            setupRecord: record
+                        };
+                        setups.push(currentSetup);
+                    } 
+                    // All other measurement records are now treated as observations ("To" points)
+                    else if (currentSetup && record.words['11'] && record.words['21']) {
+                        // --- NEW: Identify Face ---
+                        const vaStr = record.words['22']?.data;
+                        if (vaStr) {
+                            const vaDecimal = gsiAngleToDecimal(vaStr);
+                            // Add the face property directly to the record object
+                            record.face = (vaDecimal > 180 && vaDecimal < 360) ? 'Face II' : 'Face I';
+                        } else {
+                            record.face = 'N/A';
+                        }
+                        // --- END NEW ---
+                        currentSetup.observations.push(record);
+                    }
+                });
+                this.tpsSetups = setups;
+            }
+
+            
+            // This is a helper function to correctly average circular values like angles.
+            meanAngles(angles) {
+                const toRad = Math.PI / 180;
+                const toDeg = 180 / Math.PI;
+                let sumX = 0;
+                let sumY = 0;
+
+                angles.forEach(angle => {
+                    const rad = angle * toRad;
+                    sumX += Math.cos(rad);
+                    sumY += Math.sin(rad);
+                });
+
+                if (angles.length === 0) return 0;
+
+                const avgRad = Math.atan2(sumY / angles.length, sumX / angles.length);
+                let avgDeg = avgRad * toDeg;
+                
+                if (avgDeg < 0) {
+                    avgDeg += 360;
+                }
+                
+                return avgDeg;
+            }
+
+            reduceTpsSetups() {
+                this.reducedTpsSetups = this.tpsSetups.map((setup, index, allSetups) => {
+                    const observationsByPoint = new Map();
+                    setup.observations.forEach(obs => {
+                        const pointId = obs.words['11']?.value;
+                        if (!pointId) return;
+                        if (!observationsByPoint.has(pointId)) {
+                            observationsByPoint.set(pointId, []);
+                        }
+                        observationsByPoint.get(pointId).push(obs);
+                    });
+
+                    const reducedObservations = [];
+                    for (const [pointId, observations] of observationsByPoint.entries()) {
+                        if (observations.length === 0) continue;
+
+                        const obsWithFace = observations.map(obs => {
+                            const vaStr = obs.words['22']?.data;
+                            const vaDecimal = vaStr ? gsiAngleToDecimal(vaStr) : 0;
+                            const face = (vaDecimal > 180 && vaDecimal < 360) ? 'Face II' : 'Face I';
+                            return { ...obs, face, vaDecimal };
+                        });
+
+                        const faceI_obs = obsWithFace.filter(o => o.face === 'Face I');
+                        const faceII_obs = obsWithFace.filter(o => o.face === 'Face II');
+                        
+                        let faceICheck = { status: 'N/A', values: {} };
+                        let faceIICheck = { status: 'N/A', values: {} };
+
+                        // --- QA CHECK 1: Internal Spread Check for each face ---
+                        [faceI_obs, faceII_obs].forEach((faceGroup, i) => {
+                            if (faceGroup.length > 1) {
+                                const faceName = i === 0 ? 'Face I' : 'Face II';
+                                const checkResult = { status: 'pass', values: {} };
+                                
+                                const hzDecimals = faceGroup.map(o => gsiAngleToDecimal(o.words['21'].data));
+                                const vaDecimals = faceGroup.map(o => o.vaDecimal);
+                                const sdValues = faceGroup.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+
+                                const hzRange = (Math.max(...hzDecimals) - Math.min(...hzDecimals)) * 3600; // to seconds
+                                const vaRange = (Math.max(...vaDecimals) - Math.min(...vaDecimals)) * 3600; // to seconds
+                                const sdRange = Math.max(...sdValues) - Math.min(...sdValues);
+
+                                if (hzRange > this.qaTolerances.hzSpread) checkResult.status = 'fail';
+                                if (vaRange > this.qaTolerances.vaSpread) checkResult.status = 'fail';
+                                if (sdRange > this.qaTolerances.sdSpread) checkResult.status = 'fail';
+
+                                checkResult.values = { hzRange, vaRange, sdRange };
+                                if(i === 0) faceICheck = checkResult; else faceIICheck = checkResult;
+                            }
+                        });
+
+
+                        // --- Data Averaging ---
+                        const avgFaceI = this.averageObservations(faceI_obs);
+                        const avgFaceII = this.averageObservations(faceII_obs);
+
+                        // --- QA CHECK 2: Face I vs Face II Comparison ---
+                        let faceComparisonCheck = { status: 'N/A', values: {} };
+                        if (avgFaceI && avgFaceII) {
+                            faceComparisonCheck.status = 'pass';
+                            const hzDiff = Math.abs(avgFaceI.meanHz - (avgFaceII.meanHz > 180 ? avgFaceII.meanHz - 180 : avgFaceII.meanHz + 180)) * 3600;
+                            const vaSum = avgFaceI.meanV + avgFaceII.meanV;
+                            const vaDiff = Math.abs(360 - vaSum) * 3600;
+                            
+                            if (hzDiff > this.qaTolerances.faceHz) faceComparisonCheck.status = 'fail';
+                            if (vaDiff > this.qaTolerances.faceVa) faceComparisonCheck.status = 'fail';
+                            faceComparisonCheck.values = { hzDiff, vaDiff };
+                        }
+                        
+                        // Push a reduced observation for each face that has data
+                        if (avgFaceI) reducedObservations.push({ ...avgFaceI, qa: { spread: faceICheck, face: faceComparisonCheck } });
+                        if (avgFaceII) reducedObservations.push({ ...avgFaceII, qa: { spread: faceIICheck, face: faceComparisonCheck } });
+                    }
+                    
+                    const backsight = setup.observations[0]; // Simple heuristic for now
+                    return { ...setup, backsight, reducedObservations };
+                });
+            }
+
+            meanFaceObservations() {
+                const finalObservations = [];
+
+                this.reducedTpsSetups.forEach(setup => {
+                    const obsByPoint = new Map();
+                    // Group the already-reduced observations by pointId
+                    setup.reducedObservations.forEach(obs => {
+                        if (!obsByPoint.has(obs.pointId)) {
+                            obsByPoint.set(obs.pointId, []);
+                        }
+                        obsByPoint.get(obs.pointId).push(obs);
+                    });
+
+                    for (const [pointId, observations] of obsByPoint.entries()) {
+                        const faceI = observations.find(o => o.face === 'Face I');
+                        const faceII = observations.find(o => o.face === 'Face II');
+                        
+                        let finalObs;
+
+                        if (faceI && faceII) {
+                            // --- Case 1: We have both faces, calculate a mean ---
+                            const correctedHzII = faceII.meanHz > 180 ? faceII.meanHz - 180 : faceII.meanHz + 180;
+                            const meanHz = this.meanAngles([faceI.meanHz, correctedHzII]);
+                            const meanV = (faceI.meanV + (360 - faceII.meanV)) / 2;
+                            const meanSd = (faceI.meanSd + faceII.meanSd) / 2;
+                            const meanHr = (faceI.targetHeight + faceII.targetHeight) / 2;
+
+                            finalObs = {
+                                pointId,
+                                meanHz,
+                                meanV,
+                                meanSd,
+                                targetHeight: meanHr,
+                                faceData: { faceI, faceII } // Keep intermediate data
+                            };
+
+                        } else if (faceI || faceII) {
+                            // --- Case 2: Only one face was observed ---
+                            const obs = faceI || faceII;
+                            finalObs = {
+                                ...obs,
+                                faceData: { [obs.face.replace(' ', '')]: obs } // Store the single face
+                            };
+                        }
+
+                        if (finalObs) {
+                            finalObservations.push({
+                                atStation: setup.stationName,
+                                toPoint: pointId,
+                                instHt: setup.instrumentHeight,
+                                ...finalObs
+                            });
+                        }
+                    }
+                });
+                this.finalTpsObservations = finalObservations;
+            }
+
+            averageObservations(observations) {
+                if (!observations || observations.length === 0) {
+                    return null;
+                }
+                const pointId = observations[0].words['11'].value;
+                const face = observations[0].face;
+
+                const hzDecimals = observations.map(o => gsiAngleToDecimal(o.words['21'].data));
+                const vDecimals = observations.map(o => o.vaDecimal);
+                const sdValues = observations.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+                const hrValues = observations.map(o => o.words['87']?.value).filter(v => typeof v === 'number');
+
+                return {
+                    pointId,
+                    face,
+                    count: observations.length,
+                    meanHz: this.meanAngles(hzDecimals),
+                    meanV: this.meanAngles(vDecimals),
+                    meanSd: sdValues.length > 0 ? sdValues.reduce((a, b) => a + b, 0) / sdValues.length : 0,
+                    targetHeight: hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : 0,
+                    rawObservations: observations
+                };
+            }
+
+            isChangePoint(pointId) {
+                if (!pointId) return false;
+                const method = this.processingOptions.changePointMethod;
+                const prefix = this.processingOptions.changePointPrefix.toUpperCase();
+                const upperPointId = pointId.toUpperCase();
+                
+                switch (method) {
+                    case 'prefix': return upperPointId.startsWith(prefix);
+                    case 'numeric':
+                        if (!/^\d+$/.test(pointId)) return false;
+                        const num = parseInt(pointId);
+                        return num >= this.processingOptions.numericMin && num <= this.processingOptions.numericMax;
+                    case 'both':
+                        if (upperPointId.startsWith(prefix)) return true;
+                        if (!/^\d+$/.test(pointId)) return false;
+                        const numBoth = parseInt(pointId);
+                        return numBoth >= this.processingOptions.numericMin && numBoth <= this.processingOptions.numericMax;
+                    default: return false;
+                }
+            }
+            
+            aggregateChangePointRuns() {
+                const runsToProcess = this.levelRuns; // Use the main survey runs
+                if (!this.processingOptions.aggregateCP) return runsToProcess;
+                const aggregatedRuns = [];
+                let i = 0;
+                while (i < runsToProcess.length) {
+                    const currentRun = runsToProcess[i];
+                    if (!currentRun.backsight || !currentRun.foresights) {
+                        i++;
+                        continue;
+                    }
+                    const bsPoint = currentRun.backsight.words['11']?.value || '';
+                    const isStartOfSequence = !this.isChangePoint(bsPoint) && 
+                        currentRun.foresights.some(fs => this.isChangePoint(fs.words['11']?.value || ''));
+                    
+                    if (!isStartOfSequence) {
+                        aggregatedRuns.push(currentRun);
+                        i++;
+                        continue;
+                    }
+                    
+                    let sequenceRuns = [currentRun];
+                    let j = i + 1;
+                    while (j < runsToProcess.length) {
+                        const nextRun = runsToProcess[j];
+                        if (!nextRun || !nextRun.backsight) break;
+                        const nextBsPoint = nextRun.backsight.words['11']?.value || '';
+                        if (this.isChangePoint(nextBsPoint)) {
+                            sequenceRuns.push(nextRun);
+                            j++;
+                        } else break;
+                    }
+                    
+                    const firstRun = sequenceRuns[0];
+                    const lastRun = sequenceRuns[sequenceRuns.length - 1];
+                    const finalForesight = lastRun.foresights.find(fs => !this.isChangePoint(fs.words['11']?.value || ''));
+                    
+                    if (finalForesight) {
+                        let totalDistance = 0, totalHeightDiff = 0;
+                        sequenceRuns.forEach(run => {
+                            const bsReading = run.backsight.words['331']?.value || 0;
+                            totalDistance += run.backsight.words['32']?.value || 0;
+                            run.foresights.forEach(fs => {
+                                totalDistance += fs.words['32']?.value || 0;
+                                totalHeightDiff += (bsReading - (fs.words['332']?.value || 0));
+                            });
+                        });
+                        
+                        aggregatedRuns.push({
+                            setupNumber: firstRun.setupNumber,
+                            backsight: firstRun.backsight,
+                            foresights: [finalForesight],
+                            intermediates: [],
+                            totalTurns: sequenceRuns.length,
+                            totalDistance: totalDistance,
+                            totalHeightDiff: totalHeightDiff,
+                            isAggregated: true,
+                            changePoints: sequenceRuns.slice(0, -1).map(r => r.foresights).flat().filter(fs => this.isChangePoint(fs.words['11']?.value || ''))
+                        });
+                    } else {
+                        aggregatedRuns.push(...sequenceRuns);
+                    }
+                    i = j;
+                }
+                return aggregatedRuns;
+            }
+
+            calculateMisclose() {
+                if (!this.levelRuns || this.levelRuns.length < 1) {
+                    return null; // Not enough data for a check
+                }
+
+                let totalBS = 0;
+                let totalFS = 0;
+
+                // Use the raw, non-aggregated runs for the purest calculation of sums
+                this.levelRuns.forEach(run => {
+                    if (run.backsight && run.backsight.words['331']) {
+                        totalBS += run.backsight.words['331'].value;
+                    }
+                    run.foresights.forEach(fs => {
+                        if (fs.words['332']) {
+                            totalFS += fs.words['332'].value;
+                        }
+                    });
+                });
+
+                const measuredDiff = totalBS - totalFS;
+
+                // Find the first record in the main data with a height - this is our start point
+                const firstRecordWithHeight = this.data.find(r => r.words['83']);
+                
+                // Find the last foresight record in the main data
+                const lastForesightRecord = this.levelRuns[this.levelRuns.length - 1]?.foresights.slice(-1)[0];
+
+                if (!firstRecordWithHeight || !lastForesightRecord) {
+                    return { totalBS, totalFS, measuredDiff, type: 'incomplete' };
+                }
+
+                const startRL = firstRecordWithHeight.words['83'].value;
+                const startPointName = firstRecordWithHeight.words['11']?.value || 'Start';
+                
+                // Check if the final foresight point also has a known height in the original data
+                const endPointName = lastForesightRecord.words['11']?.value;
+                const lastPointRecordWithHeight = this.data.find(r => r.words['11']?.value === endPointName && r.words['83'] && r.lineNumber !== firstRecordWithHeight.lineNumber);
+
+                if (lastPointRecordWithHeight) {
+                    // This is a closed run between two known points
+                    const endRL = lastPointRecordWithHeight.words['83'].value;
+                    const knownDiff = endRL - startRL;
+                    const misclose = measuredDiff - knownDiff;
+                    
+                    return {
+                        totalBS,
+                        totalFS,
+                        measuredDiff,
+                        startRL,
+                        endRL,
+                        knownDiff,
+                        misclose,
+                        startPoint: startPointName,
+                        endPoint: endPointName,
+                        type: 'closed'
+                    };
+                } else {
+                    // This is an open run, starting from a known point
+                    return {
+                        totalBS,
+                        totalFS,
+                        measuredDiff,
+                        startPoint: startPointName,
+                        type: 'open'
+                    };
+                }
+            }
+
+            analyzePointRepeatability() {
+                const pointData = new Map();
+
+                // Group all calculated levels by point ID
+                this.data.forEach(record => {
+                    // Only consider foresight and intermediate sight records with a calculated level
+                    if ((record.type === 'foresight' || record.type === 'intermediate') && record.calculatedRL !== undefined) {
+                        const pointId = record.words['11']?.value;
+                        if (!pointId) return;
+
+                        // --- NEW LOGIC ---
+                        // If aggregation is enabled, skip points that are identified as change points.
+                        if (this.processingOptions.aggregateCP && this.isChangePoint(pointId)) {
+                            return; // Skip this record
+                        }
+                        // --- END NEW LOGIC ---
+
+                        if (!pointData.has(pointId)) {
+                            pointData.set(pointId, { rls: [] });
+                        }
+                        pointData.get(pointId).rls.push(record.calculatedRL);
+                    }
+                });
+
+                const analysisResults = [];
+                // Analyze points with more than one observation
+                for (const [pointId, data] of pointData.entries()) {
+                    if (data.rls.length > 1) {
+                        const min = Math.min(...data.rls);
+                        const max = Math.max(...data.rls);
+                        const sum = data.rls.reduce((a, b) => a + b, 0);
+                        
+                        analysisResults.push({
+                            pointId: pointId,
+                            count: data.rls.length,
+                            minRL: min,
+                            maxRL: max,
+                            spread: (max - min) * 1000, // Convert to mm
+                            avgRL: sum / data.rls.length,
+                            allRLs: data.rls.map(rl => rl.toFixed(4)).join(', ')
+                        });
+                    }
+                }
+                
+                // Sort by point ID for consistency
+                return analysisResults.sort((a, b) => a.pointId.localeCompare(b.pointId, undefined, { numeric: true }));
+            }
+
+            calculateReducedLevels() {
+                // Find the first point with a known height to start the calculation.
+                const firstBenchmark = this.data.find(rec => rec.words['83']);
+                if (!firstBenchmark) {
+                    console.warn("No starting elevation (WI 83) found. Cannot calculate reduced levels.");
+                    return; // Exit if no starting point
+                }
+
+                const knownLevels = {};
+                const startPointId = firstBenchmark.words['11'].value;
+                knownLevels[startPointId] = firstBenchmark.words['83'].value;
+
+                // Use a map for efficient lookup and modification of the original records
+                const recordMap = new Map(this.data.map(rec => [rec.lineNumber, rec]));
+
+                // Iterate through the raw, non-aggregated runs of the current dataset
+                for (const run of this.levelRuns) {
+                    const bsRecord = run.backsight;
+                    const bsPointId = bsRecord.words['11']?.value;
+
+                    // A setup must have a backsight to a point with a known level
+                    if (!bsPointId || typeof knownLevels[bsPointId] === 'undefined') {
+                        console.warn(`Skipping setup ${run.setupNumber}: Backsight point "${bsPointId}" has no known level.`);
+                        continue; // Can't calculate this setup, move to the next
+                    }
+                    
+                    const bsReading = bsRecord.words['331']?.value;
+                    if (typeof bsReading !== 'number') {
+                        console.warn(`Skipping setup ${run.setupNumber}: No valid backsight reading.`);
+                        continue;
+                    }
+
+                    const heightOfCollimation = knownLevels[bsPointId] + bsReading;
+
+                    // Process Intermediate Sights
+                    run.intermediates.forEach(isRecord => {
+                        const isPointId = isRecord.words['11']?.value;
+                        const isReading = isRecord.words['333']?.value;
+                        if (isPointId && typeof isReading === 'number') {
+                            const calculatedRL = heightOfCollimation - isReading;
+                            const originalRecord = recordMap.get(isRecord.lineNumber);
+                            if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Intermediate sights do not establish new known points, so we don't add them to knownLevels
+                        }
+                    });
+
+                    // Process Foresights
+                    run.foresights.forEach(fsRecord => {
+                        const fsPointId = fsRecord.words['11']?.value;
+                        const fsReading = fsRecord.words['332']?.value;
+                        if (fsPointId && typeof fsReading === 'number') {
+                            const calculatedRL = heightOfCollimation - fsReading;
+                            const originalRecord = recordMap.get(fsRecord.lineNumber);
+                            if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Add this new foresight level to our list of known levels for subsequent setups
+                            knownLevels[fsPointId] = calculatedRL;
+                        }
+                    });
+                }
+            }
+
+
+            generateReport() {
+                let report = 'LEVELLING REPORT\n================\n\n';
+
+                if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
+                    report += `NOTE: A ${this.calibrationInfo.type} was detected and excluded from this analysis.\n`;
+                    report += `Original file had ${this.fullData.length} records. Processing ${this.data.length} main survey records.\n\n`;
+                }
+                
+                report += `Generated: ${new Date().toLocaleString()}\n`;
+                report += `Records Shown: ${this.stats.recordCount}\n`;
+                report += `Unique Points: ${this.stats.pointCount}\n`;
+                report += `Setups: ${this.stats.setupCount}\n`;
+                report += `Method: ${this.stats.method}\n`;
+                report += `Height Range: ${this.stats.heightRange}\n`;
+                
+                if (this.processingOptions.aggregateCP) {
+                    let cpInfo = 'Change Point Processing: Enabled (';
+                    const { changePointMethod, changePointPrefix, numericMin, numericMax } = this.processingOptions;
+                    if (changePointMethod === 'prefix') cpInfo += `Prefix: ${changePointPrefix}`;
+                    else if (changePointMethod === 'numeric') cpInfo += `Numeric: ${numericMin}-${numericMax}`;
+                    else cpInfo += `Both: ${changePointPrefix} and ${numericMin}-${numericMax}`;
+                    cpInfo += ')\n';
+                    report += cpInfo;
+                }
+                
+                report += '\nPOINT          TYPE          READING       DISTANCE      HEIGHT        CALCULATED RL SETUP\n';
+                report += '------------------------------------------------------------------------------------------\n';
+                
+                this.data.forEach(record => {
+                    const point = (record.words['11']?.value || '').padEnd(14);
+                    const type = record.type.padEnd(13);
+                    const reading = (['331', '332', '333', '330'].map(wi => record.words[wi] ? record.words[wi].value.toFixed(5) : null).find(Boolean) || '').padStart(13);
+                    const dist = (record.words['32'] ? record.words['32'].value.toFixed(3) : '').padStart(13);
+                    const hgt = (record.words['83'] ? record.words['83'].value.toFixed(4) : '').padStart(13);
+                    const calcRL = ((record.type === 'foresight' || record.type === 'intermediate') && record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4).padStart(13) : ''.padStart(13);
+                    const setup = (String(record.setupNumber) || '').padStart(5);
+                    
+                    report += `${point} ${type} ${reading} ${dist} ${hgt} ${calcRL} ${setup}\n`;
+                });
+                
+                if (this.levelRuns && this.levelRuns.length > 0) {
+                    report += '\nLEVEL RUN SUMMARY\n==================\n\n';
+                    const runsToShow = this.processingOptions.aggregateCP ? this.aggregatedRuns : this.levelRuns;
+                    
+                    runsToShow.forEach(run => {
+                        const bsPoint = run.backsight.words['11']?.value || '';
+                        const bsReading = (run.backsight.words['331']?.value || 0).toFixed(5);
+                        const bsDist = (run.backsight.words['32']?.value || 0).toFixed(3);
+                        report += `Setup ${run.setupNumber}:\n  BS: ${bsPoint.padEnd(10)} (${bsReading}m @ ${bsDist}m)\n`;
+
+                        if (this.processingOptions.showCPDetails && run.changePoints?.length > 0) {
+                            run.changePoints.forEach(cp => {
+                                const cpPoint = cp.words['11']?.value || '';
+                                const cpReading = (cp.words['332']?.value || 0).toFixed(5);
+                                const cpDist = (cp.words['32']?.value || 0).toFixed(3);
+                                report += `  CP: ${cpPoint.padEnd(10)} (${cpReading}m @ ${cpDist}m)\n`;
+                            });
+                        }
+                        
+                        run.foresights.forEach(fs => {
+                            const fsPoint = fs.words['11']?.value || '';
+                            const fsReading = (fs.words['332']?.value || 0).toFixed(5);
+                            const fsDist = (fs.words['32']?.value || 0).toFixed(3);
+                            const heightDiff = run.isAggregated 
+                                ? run.totalHeightDiff.toFixed(5) 
+                                : ((run.backsight.words['331']?.value || 0) - (fs.words['332']?.value || 0)).toFixed(5);
+                            
+                            let fsLine = `  FS: ${fsPoint.padEnd(10)} (${fsReading}m @ ${fsDist}m) Δh=${heightDiff} m`;
+                            if (this.processingOptions.includeTurnCount && run.isAggregated && run.totalTurns > 1) {
+                                fsLine += ` [${run.totalTurns} turns]`;
+                            }
+                            report += fsLine + '\n';
+                        });
+                        
+                        run.intermediates.forEach(is => {
+                            const isPoint = is.words['11']?.value || '';
+                            const isReading = (is.words['333']?.value || 0).toFixed(5);
+                            const isDist = (is.words['32']?.value || 0).toFixed(3);
+                            report += `  IS: ${isPoint.padEnd(10)} (${isReading}m @ ${isDist}m)\n`;
+                        });
+                        report += '\n';
+                    });
+                }
+
+                const miscloseData = this.calculateMisclose();
+    
+                if (miscloseData) {
+                    report += '\nLEVEL RUN CLOSURE CHECK\n';
+                    report += '========================\n';
+                    report += `Total Backsight Sum (ΣBS) : ${miscloseData.totalBS.toFixed(5)} m\n`;
+                    report += `Total Foresight Sum (ΣFS) : ${miscloseData.totalFS.toFixed(5)} m\n`;
+                    report += `Measured ΔH (ΣBS - ΣFS)   : ${miscloseData.measuredDiff.toFixed(5)} m\n`;
+                    
+                    if (miscloseData.type === 'closed') {
+                        report += '------------------------\n';
+                        report += `Start Point (${miscloseData.startPoint}) RL: ${miscloseData.startRL.toFixed(4)} m\n`;
+                        report += `End Point   (${miscloseData.endPoint}) RL: ${miscloseData.endRL.toFixed(4)} m\n`;
+                        report += `Known ΔH (End RL - Start RL)  : ${miscloseData.knownDiff.toFixed(5)} m\n`;
+                        report += '------------------------\n';
+                        report += `Misclose                    : ${(miscloseData.misclose * 1000).toFixed(1)} mm\n`;
+                    } else {
+                        report += '------------------------\n';
+                        report += `Note: Run starts on point ${miscloseData.startPoint} but does not close on a point with a known height.\n`;
+                        report += 'Misclose can only be calculated for runs between two known benchmarks.\n';
+                    }
+                }
+                
+                return report;
+            }
+
+            exportStarNet() {
+                let output = '# GSI Level Data Export\n';
+                output += `# Generated: ${new Date().toLocaleString()}\n`;
+                output += `# Method: ${this.stats.method}\n`;
+                output += `# Setups: ${this.stats.setupCount}\n\n`;
+                
+                output += '.UNITS METERS\n';
+                output += '#.SEPARATOR /\n\n';
+
+                if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
+                    output += `# NOTE: A ${this.calibrationInfo.type} was detected at the beginning of the file and has been excluded from this export.\n\n`;
+                }
+                
+                const firstPoint = this.data.find(r => r.words['11'] && r.words['83']);
+                if (firstPoint) {
+                    output += '# Fixed elevation - uncomment if needed:\n';
+                    output += `#E ${firstPoint.words['11'].value} ${firstPoint.words['83'].value.toFixed(4)}\n\n`;
+                }
+                
+                const runsToProcess = this.processingOptions.aggregateCP ? this.aggregatedRuns : this.levelRuns;
+                
+                if (runsToProcess && runsToProcess.length > 0) {
+                    runsToProcess.forEach(run => {
+                        const bsPoint = run.backsight.words['11'] ? run.backsight.words['11'].value : '';
+                        const bsReading = run.backsight.words['331'] ? run.backsight.words['331'].value : 0;
+                        const bsDistance = run.backsight.words['32'] ? run.backsight.words['32'].value : 0;
+                        
+                        run.foresights.forEach(fs => {
+                            const fsPoint = fs.words['11'] ? fs.words['11'].value : '';
+                            const fsReading = fs.words['332'] ? fs.words['332'].value : 0;
+                            const fsDistance = fs.words['32'] ? fs.words['32'].value : 0;
+                            
+                            if (bsPoint && fsPoint) {
+                                let heightDiff, totalDistance;
+                                let comment = '';
+                                
+                                if (run.isAggregated) {
+                                    heightDiff = run.totalHeightDiff;
+                                    totalDistance = run.totalDistance;
+                                    comment = `# Setup ${run.setupNumber}: Aggregated ${run.totalTurns} turns, Total distance=${totalDistance.toFixed(3)}m`;
+                                } else {
+                                    heightDiff = bsReading - fsReading;
+                                    totalDistance = bsDistance + fsDistance;
+                                    comment = `# Setup ${run.setupNumber}: BS=${bsDistance.toFixed(3)}m, FS=${fsDistance.toFixed(3)}m`;
+                                }
+                                
+                                output += comment + '\n';
+                                output += `L ${bsPoint}-${fsPoint} ${heightDiff.toFixed(5)} ${totalDistance.toFixed(3)}\n\n`;
+                            }
+                        });
+                        
+                        run.intermediates.forEach(is => {
+                            const isPoint = is.words['11'] ? is.words['11'].value : '';
+                            const isHeight = is.words['83'] ? is.words['83'].value : null;
+                            
+                            if (isPoint && isHeight !== null) {
+                                output += '# Intermediate sight - uncomment if needed:\n';
+                                output += `#E ${isPoint} ${isHeight.toFixed(4)}\n\n`;
+                            }
+                        });
+                    });
+                }
+                
+                output += '# End of level data\n';
+                return output;
+            }
+
+            exportCSV() {
+                let csv = 'Point,Type,Reading,Distance,Height,CalculatedRL,Setup,Line\n';
+                this.data.forEach(record => {
+                    const point = record.words['11']?.value || '';
+                    const type = record.type;
+                    const reading = ['331', '332', '333', '330'].map(wi => record.words[wi]?.value).find(Boolean) || '';
+                    const dist = record.words['32']?.value || '';
+                    const hgt = record.words['83']?.value || '';
+                    const calcRL = (type === 'foresight' || type === 'intermediate') && record.calculatedRL !== undefined ? record.calculatedRL : '';
+                    const setup = record.setupNumber || '';
+                    const line = record.lineNumber;
+                    
+                    csv += `"${point}","${type}","${reading}","${dist}","${hgt}","${calcRL}","${setup}","${line}"\n`;
+                });
+                return csv;
+            }
+
+            exportTpsStarNet() {
+    let output = `# StarNet data file created by GSI Viewer\n`;
+    output += `# Generated: ${new Date().toLocaleString()}\n`;
+    output += `# Export Mode: ${this.processingOptions.tpsExportMode}\n\n`;
+
+    // Helper function to convert decimal degrees to DDD-MM-SS format
+    const decimalToDMS = (decimal) => {
+        let deg = Math.floor(decimal);
+        let minFloat = (decimal - deg) * 60;
+        let min = Math.floor(minFloat);
+        let sec = Math.round((minFloat - min) * 60);
+        if (sec === 60) { min++; sec = 0; }
+        if (min === 60) { deg++; min = 0; }
+        return `${deg}-${String(min).padStart(2, '0')}-${String(sec).padStart(2, '0')}`;
+    };
+
+    // Helper to format raw GSI angle string (e.g., "35612460") to DMS
+    const gsiAngleToDMS = (gsiAngleStr) => {
+        if (!gsiAngleStr) return '0-00-00';
+        const parts = formatGsiAngle(gsiAngleStr, true); // Use existing helper
+        return `${parts.deg}-${String(parts.min).padStart(2, '0')}-${String(Math.round(parts.sec)).padStart(2, '0')}`;
+    };
+
+    if (this.processingOptions.tpsExportMode === 'raw') {
+        // --- RAW EXPORT LOGIC ---
+        this.tpsSetups.forEach(setup => {
+            output += `# Instrument Setup at station: ${setup.stationName}\n`;
+            output += `DB ${setup.stationName}\n`;
+            setup.observations.forEach(obs => {
+                const target = obs.words['11']?.value || '???';
+                const hzDMS = gsiAngleToDMS(obs.words['21']?.data);
+                const vDMS = gsiAngleToDMS(obs.words['22']?.data);
+                const sd = obs.words['31']?.value.toFixed(3) || '0.000';
+                const instHt = setup.instrumentHeight.toFixed(4);
+                const tgtHt = obs.words['87']?.value.toFixed(4) || instHt; // Use instHt as fallback
+                output += `DM ${target} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n`;
+            });
+            output += `DE\n\n`;
+        });
+
+    } else {
+        // --- MEANED EXPORT LOGIC (Existing Logic) ---
+        const setups = new Map();
+        this.finalTpsObservations.forEach(obs => {
+            if (!setups.has(obs.atStation)) {
+                setups.set(obs.atStation, []);
+            }
+            setups.get(obs.atStation).push(obs);
+        });
+
+        for (const [station, observations] of setups.entries()) {
+            output += `# Instrument Setup at station: ${station}\n`;
+            output += `DB ${station}\n\n`;
+            observations.forEach(obs => {
+                const faceICount = obs.faceData.faceI?.count || 0;
+                const faceIICount = obs.faceData.faceII?.count || 0;
+                let comment = `# Mean of ${faceICount + faceIICount} raw observation(s)`;
+                if (faceICount > 0 && faceIICount > 0) comment += ` (${faceICount} FL, ${faceIICount} FR)`;
+                output += `${comment}\n`;
+
+                const hzDMS = decimalToDMS(obs.meanHz);
+                const vDMS = decimalToDMS(obs.meanV);
+                const sd = obs.meanSd.toFixed(3);
+                const instHt = obs.instHt.toFixed(4);
+                const tgtHt = obs.targetHeight.toFixed(4);
+                output += `DM ${obs.toPoint} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n\n`;
+            });
+            output += `DE\n\n`;
+        }
+    }
+
+    output += `# End of data file\n`;
+    return output;
+}
+
+            updateTpsOptions(options) {
+        // Update QA Tolerances
+        this.qaTolerances.hzSpread = parseFloat(options.qaHzSpread) || 10;
+        this.qaTolerances.vaSpread = parseFloat(options.qaVaSpread) || 15;
+        this.qaTolerances.sdSpread = parseFloat(options.qaSdSpread) || 0.005;
+        this.qaTolerances.faceHz = parseFloat(options.qaFaceHz) || 20;
+        this.qaTolerances.faceVa = parseFloat(options.qaFaceVa) || 20;
+
+        // Update other processing options
+        this.processingOptions.tpsExportMode = options.tpsExportMode || 'meaned';
+
+        // Re-run the analysis with the new settings
+        this.reduceTpsSetups();
+        this.meanFaceObservations();
+    }
+        }
+
+        
+
+        // --- Global App State & Functions ---
+        
+        let parser = new GSIParser(); // Initialize parser on page load
+        let currentOutput = '';
+        let currentFilename = 'export';
+        let currentExtension = 'txt';
+        let isFullView = false;
+        let tpsViewMode = 'aggregated'; // Add this line ('raw' or 'aggregated')
+        let tpsIsFullView = false;
+        
+
+        const elements = {
+            themeBtn: document.getElementById('themeBtn'),
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            status: document.getElementById('status'),
+            formatStatus: document.getElementById('formatStatus'),
+            
+            
+            // UI Sections
+            statsSection: document.getElementById('statsSection'),
+            tpsStatsSection: document.getElementById('tpsStatsSection'),
+            actionsSection: document.getElementById('actionsSection'),
+            previewSection: document.getElementById('previewSection'),
+            analysisSection: document.getElementById('analysisSection'),
+            tpsPreviewSection: document.getElementById('tpsPreviewSection'),
+            outputSection: document.getElementById('outputSection'),
+            advancedSection: document.getElementById('advancedSection'),
+
+            // UI Components
+            dataTable: document.getElementById('dataTable'),
+            tpsDataTable: document.getElementById('tpsDataTable'),
+            analysisTable: document.getElementById('analysisTable'),
+            outputArea: document.getElementById('outputArea'),
+            toggleViewBtn: document.getElementById('toggleViewBtn'),
+            tpsViewToggleBtn: document.getElementById('tpsViewToggleBtn'),
+            tpsShowAllBtn: document.getElementById('tpsShowAllBtn'),
+            tpsActionsSection: document.getElementById('tpsActionsSection'),
+            tpsStarnetBtn: document.getElementById('tpsStarnetBtn'),     
+            tpsAdvancedBtn: document.getElementById('tpsAdvancedBtn'),
+            tpsAdvancedSection: document.getElementById('tpsAdvancedSection'),
+            tpsAdvancedToggle: document.getElementById('tpsAdvancedToggle'),
+            applyTpsAdvanced: document.getElementById('applyTpsAdvanced'),
+            applyTpsText: document.getElementById('applyTpsText'),
+            applyTpsSpinner: document.getElementById('applyTpsSpinner'),
+            qaHzSpread: document.getElementById('qaHzSpread'),
+            qaVaSpread: document.getElementById('qaVaSpread'),
+            qaSdSpread: document.getElementById('qaSdSpread'),
+            qaFaceHz: document.getElementById('qaFaceHz'),
+            qaFaceVa: document.getElementById('qaFaceVa'), 
+            
+            // Harmonized Stat Values
+            statMethod: document.getElementById('statMethod'),
+            statSetups: document.getElementById('statSetups'),
+            statObservations: document.getElementById('statObservations'),
+            statPoints: document.getElementById('statPoints'),
+            tpsStatMethod: document.getElementById('tpsStatMethod'),
+            tpsStatSetups: document.getElementById('tpsStatSetups'),
+            tpsStatObservations: document.getElementById('tpsStatObservations'),
+            tpsStatPoints: document.getElementById('tpsStatPoints'),
+            
+            // Buttons and Controls
+            reportBtn: document.getElementById('reportBtn'),
+            starnetBtn: document.getElementById('starnetBtn'),
+            csvBtn: document.getElementById('csvBtn'),
+            advancedBtn: document.getElementById('advancedBtn'),
+            downloadBtn: document.getElementById('downloadBtn'),
+            copyBtn: document.getElementById('copyBtn'),
+            advancedToggle: document.getElementById('advancedToggle'),
+            applyAdvanced: document.getElementById('applyAdvanced'),
+            aboutBtn: document.getElementById('aboutBtn'),
+            aboutSection: document.getElementById('aboutSection'),
+            aboutToggle: document.getElementById('aboutToggle'),
+            
+
+            // Advanced Options Form
+            aggregateCP: document.getElementById('aggregateCP'),
+            changePointPrefix: document.getElementById('changePointPrefix'),
+            includeTurnCount: document.getElementById('includeTurnCount'),
+            showCPDetails: document.getElementById('showCPDetails'),
+            retainCalibration: document.getElementById('retainCalibration'),
+            prefixSettings: document.getElementById('prefixSettings'),
+            numericSettings: document.getElementById('numericSettings'),
+            numericMin: document.getElementById('numericMin'),
+            numericMax: document.getElementById('numericMax'),
+            applyText: document.getElementById('applyText'),
+            applySpinner: document.getElementById('applySpinner')
+        };
+
+
+        function formatGsiAngle(gsiAngleStr, raw = false) {
+            if (!gsiAngleStr || gsiAngleStr.length < 5) { // Need at least MMSSs
+                return raw ? {deg:0, min:0, sec:0} : '—';
+            }
+            
+            const len = gsiAngleStr.length;
+            const tenth = gsiAngleStr.substring(len - 1);
+            const secStr = gsiAngleStr.substring(len - 3, len - 1);
+            const minStr = gsiAngleStr.substring(len - 5, len - 3);
+            let degStr = gsiAngleStr.substring(0, len - 5);
+
+            if (degStr === '') {
+                degStr = '0';
+            }
+
+            const deg = parseInt(degStr, 10);
+            const min = parseInt(minStr, 10);
+            const sec = parseFloat(`${secStr}.${tenth}`);
+
+            if (raw) {
+                // Return a raw object for calculations
+                return { deg, min, sec };
+            }
+
+            // Return a formatted string for display
+            return `${deg}° ${minStr}' ${secStr}.${tenth}"`;
+        }
+
+        function formatDecimalDegrees(decimal) {
+            if (typeof decimal !== 'number' || isNaN(decimal)) return '—';
+            
+            const deg = Math.floor(decimal);
+            const minFloat = (decimal - deg) * 60;
+            const min = Math.floor(minFloat);
+            const sec = ((minFloat - min) * 60).toFixed(1);
+
+            // Pad minutes and seconds with a leading zero if they are less than 10
+            const minStr = String(min).padStart(2, '0');
+            const secStr = parseFloat(sec) < 10 ? '0' + sec : sec;
+
+            return `${deg}° ${minStr}' ${secStr}"`;
+        }
+
+        
+
+        function gsiAngleToDecimal(gsiAngleStr) {
+            const angle = formatGsiAngle(gsiAngleStr, true); // Get raw parts
+            return angle.deg + angle.min / 60 + angle.sec / 3600;
+        }
+
+
+
+
+        function initializeApp() {
+            setupEventListeners();
+            loadSavedTheme();
+        }
+
+        function setupEventListeners() {
+            
+            elements.tpsStarnetBtn.addEventListener('click', () => {
+        currentExtension = 'dat'; // StarNet files often use .dat
+        showOutput(parser.exportTpsStarNet(), 'StarNet (TPS)');
+    });
+
+    elements.tpsAdvancedBtn.addEventListener('click', toggleTpsAdvancedSection);
+
+    elements.tpsAdvancedToggle.addEventListener('click', hideTpsAdvancedSection);
+
+    if (elements.aboutBtn && elements.aboutSection && elements.aboutToggle) {
+                elements.aboutBtn.addEventListener('click', () => {
+                    elements.aboutSection.classList.toggle('hidden');
+                });
+                elements.aboutToggle.addEventListener('click', () => {
+                    elements.aboutSection.classList.add('hidden');
+                });
+            }
+
+    elements.applyTpsAdvanced.addEventListener('click', () => {
+        const button = elements.applyTpsAdvanced;
+        button.disabled = true;
+        elements.applyTpsText.style.display = 'none';
+        elements.applyTpsSpinner.style.display = 'inline-block';
+
+        try {
+            const newOptions = {
+                tpsExportMode: document.querySelector('input[name="tpsExportMode"]:checked').value,
+                qaHzSpread: elements.qaHzSpread.value,
+                qaVaSpread: elements.qaVaSpread.value,
+                qaSdSpread: elements.qaSdSpread.value,
+                qaFaceHz: elements.qaFaceHz.value,
+                qaFaceVa: elements.qaFaceVa.value
+            };
+
+            parser.updateTpsOptions(newOptions);
+            updateTpsUI(); // Re-render the UI with new QA results
+
+            elements.applyTpsText.textContent = '✓ Applied';
+        } catch (error) {
+            console.error('Error applying TPS settings:', error);
+            showStatus(`✗ Error reprocessing: ${error.message}`, 'error');
+        } finally {
+            setTimeout(() => {
+                elements.applyTpsSpinner.style.display = 'none';
+                elements.applyTpsText.style.display = 'inline';
+                button.disabled = false;
+                setTimeout(() => {
+                    elements.applyTpsText.textContent = 'Apply & Reprocess';
+                }, 2000);
+            }, 300);
+        }
+    });
+
+            elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
+            elements.uploadArea.addEventListener('dragover', handleDragOver);
+            elements.uploadArea.addEventListener('dragleave', handleDragLeave);
+            elements.uploadArea.addEventListener('drop', handleDrop);
+            elements.fileInput.addEventListener('change', handleFileSelect);
+            elements.advancedBtn.addEventListener('click', toggleAdvancedSection);
+            elements.advancedToggle.addEventListener('click', hideAdvancedSection);
+            document.querySelectorAll('input[name="changePointMethod"]').forEach(radio => {
+                radio.addEventListener('change', (e) => toggleChangePointSettings(e.target.value));
+            });
+            elements.applyAdvanced.addEventListener('click', applyAdvancedSettings);
+            elements.reportBtn.addEventListener('click', () => {
+                setActiveExportButton('reportBtn');
+                currentExtension = 'txt';
+                showOutput(parser.generateReport(), 'Report');
+            });
+            elements.starnetBtn.addEventListener('click', () => {
+                setActiveExportButton('starnetBtn');
+                currentExtension = 'dat';
+                showOutput(parser.exportStarNet(), 'StarNet');
+            });
+            elements.csvBtn.addEventListener('click', () => {
+                setActiveExportButton('csvBtn');
+                currentExtension = 'csv';
+                showOutput(parser.exportCSV(), 'CSV');
+            });
+            elements.downloadBtn.addEventListener('click', downloadOutput);
+            elements.copyBtn.addEventListener('click', copyOutput);
+            
+         
+            elements.toggleViewBtn.addEventListener('click', () => {
+                isFullView = !isFullView;
+                updateLevelingUI(); 
+            });
+
+            elements.tpsShowAllBtn.addEventListener('click', () => {
+                tpsIsFullView = !tpsIsFullView;
+                updateTpsUI(); // Re-render the table
+            });
+
+            elements.tpsDataTable.addEventListener('click', (e) => {
+                if (e.target && e.target.classList.contains('expander')) {
+                    const targetId = e.target.dataset.targetId;
+                    const detailsRow = document.getElementById(targetId);
+                    if (detailsRow) {
+                        detailsRow.classList.toggle('hidden');
+                        e.target.textContent = detailsRow.classList.contains('hidden') ? '+' : '−';
+                    }
+                }
+            });
+
+            elements.tpsViewToggleBtn.addEventListener('click', () => {
+                tpsViewMode = (tpsViewMode === 'raw') ? 'aggregated' : 'raw';
+                updateTpsUI(); // Re-render the table with the new mode
+            });
+            
+            elements.uploadArea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    elements.fileInput.click();
+                }
+            });
+        }
+
+        
+
+        function handleDragOver(e) { e.preventDefault(); elements.uploadArea.classList.add('dragover'); }
+        function handleDragLeave(e) { elements.uploadArea.classList.remove('dragover'); }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            elements.uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        }
+
+        function toggleAdvancedSection() {
+            elements.advancedSection.classList.toggle('hidden');
+            elements.advancedBtn.textContent = elements.advancedSection.classList.contains('hidden') ? '⚙️ Advanced' : '⚙️ Hide Advanced';
+        }
+        function hideAdvancedSection() {
+            elements.advancedSection.classList.add('hidden');
+            elements.advancedBtn.textContent = '⚙️ Advanced';
+        }
+        function toggleTpsAdvancedSection() {
+    elements.tpsAdvancedSection.classList.toggle('hidden');
+    elements.tpsAdvancedBtn.textContent = elements.tpsAdvancedSection.classList.contains('hidden') ? '⚙️ Advanced' : '⚙️ Hide Advanced';
+}
+
+function hideTpsAdvancedSection() {
+    elements.tpsAdvancedSection.classList.add('hidden');
+    elements.tpsAdvancedBtn.textContent = '⚙️ Advanced';
+}
+        function toggleAboutSection() {
+            elements.aboutSection.classList.toggle('hidden');
+            elements.aboutBtn.textContent = elements.aboutSection.classList.contains('hidden') ? 'ℹ️ About' : 'ℹ️ Hide About';
+        }
+        function hideAboutSection() {
+            elements.aboutSection.classList.add('hidden');
+            elements.aboutBtn.textContent = 'ℹ️ About';
+        }
+
+        function setActiveExportButton(activeButtonId) {
+            ['reportBtn', 'starnetBtn', 'csvBtn'].forEach(id => elements[id].classList.remove('primary'));
+            elements[activeButtonId].classList.add('primary');
+        }
+
+        function toggleChangePointSettings(method) {
+            elements.prefixSettings.style.display = (method === 'prefix' || method === 'both') ? 'block' : 'none';
+            elements.numericSettings.style.display = (method === 'numeric' || method === 'both') ? 'block' : 'none';
+        }
+
+        async function applyAdvancedSettings() {
+            const button = elements.applyAdvanced;
+            const originalText = elements.applyText.textContent;
+            button.disabled = true;
+            elements.applyText.style.display = 'none';
+            elements.applySpinner.style.display = 'inline-block';
+            
+            try {
+                const newOptions = {
+                    aggregateCP: elements.aggregateCP.checked,
+                    changePointPrefix: elements.changePointPrefix.value || 'CP',
+                    changePointMethod: document.querySelector('input[name="changePointMethod"]:checked').value,
+                    numericMin: parseInt(elements.numericMin.value) || 1,
+                    numericMax: parseInt(elements.numericMax.value) || 999,
+                    includeTurnCount: elements.includeTurnCount.checked,
+                    showCPDetails: elements.showCPDetails.checked,
+                    retainCalibrationData: elements.retainCalibration.checked
+                };
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                parser.updateProcessingOptions(newOptions);
+                updateUI();
+                elements.outputSection.classList.add('hidden'); // Hide old output
+                
+                elements.applyText.textContent = '✓ Applied';
+                button.style.background = 'var(--accent)';
+                button.style.color = 'var(--bg)';
+            } catch (error) {
+                console.error('Reprocessing error:', error);
+                showStatus(`✗ Error reprocessing: ${error.message}`, 'error');
+            } finally {
+                elements.applySpinner.style.display = 'none';
+                elements.applyText.style.display = 'inline';
+                button.disabled = false;
+                setTimeout(() => {
+                    elements.applyText.textContent = originalText;
+                    button.style.background = '';
+                    button.style.color = '';
+                }, 2000);
+            }
+        }
+
+        function processFile(file) {
+            resetUI();
+            showStatus('Processing...', 'info');
+            currentFilename = file.name.replace(/\.[^/.]+$/, ""); 
+
+            const reader = new FileReader();
+            reader.onload = e => {
+                const timeoutId = setTimeout(() => {
+                    resetUI();
+                    showStatus('✗ Processing timed out. The file might be too large or malformed.', 'error');
+                }, PROCESSING_TIMEOUT);
+
+                try {
+                    parser = new GSIParser();
+                    parser.parse(e.target.result); // This will determine the fileType
+
+                    // --- MODE SWITCHER LOGIC ---
+                    if (parser.fileType === 'TPS') {
+                        displayTpsMode();
+                        updateTpsUI();
+                    } else if (parser.fileType === 'Levelling') {
+                        displayLevelingMode();
+                        if (parser.data.length === 0 && parser.calibrationInfo.isCalibration) {
+                            updateLevelingUI(); // Show empty tables but correct titles
+                            return; 
+                        }
+                        updateLevelingUI();
+                        elements.reportBtn.click();
+                    } else {
+                        // This case handles files that are not recognized as Leveling or TPS
+                        showStatus('✗ No valid GSI Leveling or TPS data found to process.', 'error');
+                        resetUI();
+                        return;
+                    }
+
+                    // Update the upload area to show the loaded file name
+                    elements.uploadArea.innerHTML = `
+                        <div style="font-size: 36px; margin-bottom: 10px;">📄</div>
+                        <div><strong>File Loaded:</strong> ${escapeHtml(file.name)}</div>
+                        <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                            Drop or click to load a new file.
+                        </div>
+                    `;
+
+                } catch (error) {
+                    resetUI();
+                    showStatus(`✗ ${escapeHtml(error.message)}`, 'error');
+                    console.error('Parsing error:', error);
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            };
+            
+            reader.onerror = () => {
+                resetUI();
+                showStatus('✗ Error reading file.', 'error');
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        function resetUI() {
+    ['status', 'formatStatus', 'statsSection', 'tpsStatsSection', 'actionsSection', 'tpsActionsSection', 'previewSection', 'outputSection', 'advancedSection', 'analysisSection', 'tpsPreviewSection'].forEach(id => {
+        if (elements[id]) {
+            elements[id].classList.add('hidden');
+        }
+    });
+            elements.dataTable.innerHTML = '';
+            elements.analysisTable.innerHTML = '';
+            elements.fileInput.value = '';
+            isFullView = false;
+            elements.uploadArea.innerHTML = `
+                <div style="font-size: 36px; margin-bottom: 10px;">📁</div>
+                <div>Drop GSI file here or click to select</div>
+                <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                    Supports .gsi, .txt, and other level data formats
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showStatus(message, type) {
+            elements.status.innerHTML = message;
+            elements.status.className = 'status ' + type;
+            elements.status.classList.remove('hidden');
+        }
+
+       function updateLevelingUI() {
+            // --- Populate Harmonized Stats ---
+            const observationCount = parser.data.filter(r => ['backsight', 'foresight', 'intermediate'].includes(r.type)).length;
+            elements.statMethod.textContent = `LEVEL (${parser.stats.method})`;
+            elements.statSetups.textContent = parser.stats.setupCount;
+            elements.statObservations.textContent = observationCount;
+            elements.statPoints.textContent = parser.stats.pointCount;
+
+            // Update toggle button visibility and text (logic is the same)
+            if (parser.data.length > 20) {
+                elements.toggleViewBtn.style.display = 'inline-block';
+                let fullViewText = parser.data.length > MAX_PREVIEW_ROWS ? `first ${MAX_PREVIEW_ROWS}` : parser.data.length;
+                elements.toggleViewBtn.textContent = isFullView ? 'Show Preview (20)' : `Show All (${fullViewText}) Rows`;
+            } else {
+                elements.toggleViewBtn.style.display = 'none';
+            }
+            const dataToDisplay = isFullView ? parser.data.slice(0, MAX_PREVIEW_ROWS) : parser.data.slice(0, 20);
+
+            // Update main data table (rest of function is the same)
+            elements.dataTable.innerHTML = '';
+            if (dataToDisplay.length === 0) {
+                const row = elements.dataTable.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 7;
+                cell.textContent = "No data to display in this view.";
+                cell.style.textAlign = 'center';
+            } else {
+                dataToDisplay.forEach(function(record) {
+                    const row = document.createElement('tr');
+                    const point = record.words['11']?.value || '';
+                    const type = record.type;
+                    let reading = '';
+                    const readingWord = ['331', '332', '333', '330'].map(wi => record.words[wi]).find(wordObj => wordObj && typeof wordObj.value === 'number');
+                    if (readingWord) reading = readingWord.value.toFixed(5);
+                    const distance = (record.words['32'] && typeof record.words['32'].value === 'number') ? record.words['32'].value.toFixed(3) : '';
+                    const height = (record.words['83'] && typeof record.words['83'].value === 'number') ? record.words['83'].value.toFixed(4) : '';
+                    const setup = record.setupNumber || '';
+                    const calculatedRL = (record.calculatedRL !== undefined && typeof record.calculatedRL === 'number') ? record.calculatedRL.toFixed(4) : '';
+                    row.innerHTML = `
+                        <td>${escapeHtml(point)}</td>
+                        <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
+                        <td class="numeric">${escapeHtml(reading)}</td>
+                        <td class="numeric">${escapeHtml(distance)}</td>
+                        <td class="numeric">${escapeHtml(height)}</td>
+                        <td class="numeric"><span class="calculated-rl">${(type === 'foresight' || type === 'intermediate') ? calculatedRL : ''}</span></td>
+                        <td class="numeric">${escapeHtml(String(setup))}</td>
+                    `;
+                    elements.dataTable.appendChild(row);
+                });
+            }
+            const analysisResults = parser.analyzePointRepeatability();
+            elements.analysisTable.innerHTML = ''; 
+            if (analysisResults.length > 0) {
+                analysisResults.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${escapeHtml(item.pointId)}</td>
+                        <td class="numeric">${item.count}</td>
+                        <td class="numeric">${item.minRL.toFixed(4)}</td>
+                        <td class="numeric">${item.maxRL.toFixed(4)}</td>
+                        <td class="numeric">${item.spread.toFixed(1)}</td>
+                        <td class="numeric"><strong>${item.avgRL.toFixed(4)}</strong></td>
+                        <td><small>${escapeHtml(item.allRLs)}</small></td>
+                    `;
+                    elements.analysisTable.appendChild(row);
+                });
+                elements.analysisSection.classList.remove('hidden');
+            } else {
+                elements.analysisSection.classList.add('hidden');
+            }
+        }
+
+        function updateTpsUI() {
+            elements.tpsViewToggleBtn.textContent = tpsViewMode === 'raw' ? 'Switch to Aggregated View' : 'Switch to Raw Log';
+
+            if (tpsViewMode === 'raw') {
+                // --- RAW VIEW LOGIC ---
+                const setupCount = parser.tpsSetups.length;
+                const observationCount = parser.tpsSetups.reduce((acc, setup) => acc + setup.observations.length, 0);
+                const pointCount = new Set(parser.tpsSetups.flatMap(s => s.observations.map(o => o.words['11']?.value)).filter(p => p)).size;
+                
+                // --- CORRECTED LINES START HERE ---
+                // Populate Unified Stats using the correct TPS element IDs
+                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatObservations.textContent = observationCount;
+                elements.tpsStatPoints.textContent = pointCount;
+                // --- CORRECTED LINES END HERE ---
+                
+                if (observationCount > 20 && elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'inline-block';
+                    elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
+                } else if (elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'none';
+                }
+                const rawObservations = parser.tpsSetups.flatMap(setup => setup.observations.map(obs => ({...obs, atStation: setup.stationName, instHt: setup.instrumentHeight })));
+                const dataToDisplay = tpsIsFullView ? rawObservations : rawObservations.slice(0, 20);
+
+                elements.tpsDataTable.innerHTML = '';
+                if (dataToDisplay.length === 0) {
+                    const row = elements.tpsDataTable.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 8;
+                    cell.textContent = "No measurement data found.";
+                    cell.style.textAlign = 'center';
+                } else {
+                    dataToDisplay.forEach(obs => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${escapeHtml(obs.atStation)}</td>
+                            <td><strong>${escapeHtml(obs.words['11']?.value || '')}</strong></td>
+                            <td>${escapeHtml(obs.face || 'N/A')}</td>
+                            <td class="numeric">${formatGsiAngle(obs.words['21']?.data)}</td>
+                            <td class="numeric">${formatGsiAngle(obs.words['22']?.data)}</td>
+                            <td class="numeric">${obs.words['31']?.value?.toFixed(3) || ''}</td>
+                            <td class="numeric">${obs.instHt?.toFixed(3) || ''}</td>
+                            <td class="numeric">${obs.words['87']?.value?.toFixed(3) || ''}</td>
+                        `;
+                        elements.tpsDataTable.appendChild(row);
+                    });
+                }
+            } else {
+                // --- AGGREGATED VIEW LOGIC ---
+                const finalObsCount = parser.finalTpsObservations.length;
+                const setupCount = new Set(parser.finalTpsObservations.map(o => o.atStation)).size;
+                const pointCount = new Set(parser.finalTpsObservations.map(o => o.toPoint)).size;
+                
+                // --- CORRECTED LINES START HERE ---
+                // Populate Unified Stats using the correct TPS element IDs
+                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatObservations.textContent = finalObsCount;
+                elements.tpsStatPoints.textContent = pointCount;
+                // --- CORRECTED LINES END HERE ---
+
+                if (finalObsCount > 20 && elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'inline-block';
+                    elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
+                } else if (elements.tpsShowAllBtn) {
+                    elements.tpsShowAllBtn.style.display = 'none';
+                }
+                const dataToDisplay = tpsIsFullView ? parser.finalTpsObservations : parser.finalTpsObservations.slice(0, 20);
+
+                elements.tpsDataTable.innerHTML = '';
+                if (dataToDisplay.length === 0) {
+                    const row = elements.tpsDataTable.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = 8;
+                    cell.textContent = "No aggregated observations to display.";
+                    cell.style.textAlign = 'center';
+                } else {
+                    let obsCounter = 0;
+                    dataToDisplay.forEach(obs => {
+                        obsCounter++;
+                        const l1_detailsId = `l1-details-${obsCounter}`;
+                        let qaFlag = '';
+                        const faceIspreadFail = obs.faceData.faceI?.qa.spread.status === 'fail';
+                        const faceIIspreadFail = obs.faceData.faceII?.qa.spread.status === 'fail';
+                        const faceCompareFail = obs.faceData.faceI?.qa.face.status === 'fail';
+                        if (faceIspreadFail || faceIIspreadFail || faceCompareFail) {
+                            qaFlag = ` <span class="qa-fail" title="QA Check Failed: Expand for details">!</span>`;
+                        }
+                        const summaryRow = document.createElement('tr');
+                        summaryRow.innerHTML = `
+                            <td><span class="expander" data-target-id="${l1_detailsId}">+</span>${escapeHtml(obs.atStation)}</td>
+                            <td><strong>${escapeHtml(obs.toPoint)}</strong>${qaFlag}</td>
+                            <td>Face I & II</td>
+                            <td class="numeric">${formatDecimalDegrees(obs.meanHz)}</td>
+                            <td class="numeric">${formatDecimalDegrees(obs.meanV)}</td>
+                            <td class="numeric">${obs.meanSd.toFixed(3)}</td>
+                            <td class="numeric">${obs.instHt.toFixed(3)}</td>
+                            <td class="numeric">${obs.targetHeight.toFixed(3)}</td>
+                        `;
+                        const detailsRow = document.createElement('tr');
+                        detailsRow.className = 'details-row hidden';
+                        detailsRow.id = l1_detailsId;
+                        let l1_html = `<td colspan="8"><div class="details-container"><table>`;
+                        if (obs.faceData.faceI) {
+                            const faceI = obs.faceData.faceI;
+                            const l2_faceI_id = `l2-details-f1-${obsCounter}`;
+                            const qaSpreadFail = faceI.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                            l1_html += `
+                                <tr class="summary-row">
+                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceI_id}">+</span> ${escapeHtml(faceI.pointId)}${qaSpreadFail}</td>
+                                    <td style="width: 15%;">${faceI.face} (${faceI.count} obs)</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanHz)}</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanV)}</td>
+                                    <td class="numeric" style="width: 15%;">${faceI.meanSd.toFixed(3)}</td>
+                                    <td class="numeric" style="width: 15%;"></td>
+                                </tr>
+                                <tr id="${l2_faceI_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
+                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <tbody>
+                                        ${faceI.rawObservations.map(rawObs => `
+                                            <tr>
+                                                <td></td><td></td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
+                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
+                                                <td></td>
+                                            </tr>`).join('')}
+                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                            <strong>Spread Check:</strong>
+                                            Hz: ${faceI.qa.spread.values.hzRange?.toFixed(1)}" |
+                                            V: ${faceI.qa.spread.values.vaRange?.toFixed(1)}" |
+                                            SD: ${(faceI.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+                                            <strong style="float: right;">Status: ${faceI.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                        </td></tr>
+                                    </tbody>
+                                </table></div></td></tr>`;
+                        }
+                        if (obs.faceData.faceII) {
+                            const faceII = obs.faceData.faceII;
+                            const l2_faceII_id = `l2-details-f2-${obsCounter}`;
+                            const qaSpreadFail = faceII.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                             l1_html += `
+                                <tr class="summary-row">
+                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFail}</td>
+                                    <td style="width: 15%;">${faceII.face} (${faceII.count} obs)</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanHz)}</td>
+                                    <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanV)}</td>
+                                    <td class="numeric" style="width: 15%;">${faceII.meanSd.toFixed(3)}</td>
+                                    <td class="numeric" style="width: 15%;"></td>
+                                </tr>
+                                <tr id="${l2_faceII_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
+                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <tbody>
+                                        ${faceII.rawObservations.map(rawObs => `
+                                            <tr>
+                                                <td></td><td></td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
+                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
+                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
+                                                <td></td>
+                                            </tr>`).join('')}
+                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                            <strong>Spread Check:</strong>
+                                            Hz: ${faceII.qa.spread.values.hzRange?.toFixed(1)}" |
+                                            V: ${faceII.qa.spread.values.vaRange?.toFixed(1)}" |
+                                            SD: ${(faceII.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+                                            <strong style="float: right;">Status: ${faceII.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                        </td></tr>
+                                    </tbody>
+                                </table></div></td></tr>`;
+                        }
+                        if (obs.faceData.faceI && obs.faceData.faceII) {
+                            const faceCheck = obs.faceData.faceI.qa.face;
+                             l1_html += `
+                                <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                    <strong>Face Comparison:</strong>
+                                    Hz Diff: ${faceCheck.values.hzDiff?.toFixed(1)}" |
+                                    V Sum Diff (from 360°): ${faceCheck.values.vaDiff?.toFixed(1)}"
+                                    <strong style="float: right;">Status: ${faceCheck.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
+                                </td></tr>`;
+                        }
+                        l1_html += '</table></div></td>';
+                        detailsRow.innerHTML = l1_html;
+                        elements.tpsDataTable.appendChild(summaryRow);
+                        elements.tpsDataTable.appendChild(detailsRow);
+                    });
+                }
+            }
+        }
+            
+            const setupCount = parser.tpsSetups.length;
+            // Observation count is now the number of foresights
+            const observationCount = parser.tpsSetups.reduce((acc, setup) => acc + setup.foresights.length, 0);
+            const points = new Set(parser.tpsSetups.flatMap(s => [
+                s.backsight?.words['11']?.value, 
+                ...s.foresights.map(o => o.words['11']?.value)
+            ].filter(p => p)));
+            
+            elements.tpsStatSetups.textContent = setupCount;
+            elements.tpsStatObservations.textContent = observationCount;
+            elements.tpsStatPoints.textContent = points.size;
+            elements.tpsStatMethod.textContent = 'Traverse (Inferred)';
+
+            // Populate TPS Data Table
+            elements.tpsDataTable.innerHTML = '';
+            if (observationCount === 0) {
+                const row = elements.tpsDataTable.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 9; // Updated colspan
+                cell.textContent = "No foresight measurement data found.";
+                cell.style.textAlign = 'center';
+            } else {
+                parser.tpsSetups.forEach(setup => {
+                    const atStation = setup.stationName;
+                    const fromPoint = setup.backsight ? (setup.backsight.words['11']?.value || '---') : '---';
+
+                    // Each foresight gets its own row in the table
+                    setup.foresights.forEach(obs => {
+                        const row = document.createElement('tr');
+                        const toPoint = obs.words['11']?.value || '';
+                        const hz = formatGsiAngle(obs.words['21']?.data);
+                        const vz = formatGsiAngle(obs.words['22']?.data);
+                        const sd = obs.words['31']?.value.toFixed(3) || '';
+                        const easting = obs.words['81']?.value.toFixed(3) || '';
+                        const northing = obs.words['82']?.value.toFixed(3) || '';
+                        const elevation = obs.words['83']?.value.toFixed(3) || '';
+
+                        row.innerHTML = `
+                            <td>${escapeHtml(atStation)}</td>
+                            <td>${escapeHtml(fromPoint)}</td>
+                            <td><strong>${escapeHtml(toPoint)}</strong></td>
+                            <td class="numeric">${hz}</td>
+                            <td class="numeric">${vz}</td>
+                            <td class="numeric">${sd}</td>
+                            <td class="numeric">${easting}</td>
+                            <td class="numeric">${northing}</td>
+                            <td class="numeric">${elevation}</td>
+                        `;
+                        elements.tpsDataTable.appendChild(row);
+                    });
+                });
+            }
+        
+
+        function displayLevelingMode() {
+            // Show all leveling-related sections, including the correct stats section
+            elements.statsSection.classList.remove('hidden');
+            elements.actionsSection.classList.remove('hidden'); // This is the levelling actions
+            elements.previewSection.classList.remove('hidden');
+
+    // Hide all TPS-related sections
+            elements.tpsStatsSection.classList.add('hidden');
+            elements.tpsActionsSection.classList.add('hidden'); // Hide TPS actions
+            elements.tpsPreviewSection.classList.add('hidden');
+}
+
+        function displayTpsMode() {
+    // Show all TPS-related sections, including the correct stats section
+    elements.tpsStatsSection.classList.remove('hidden');
+    elements.tpsActionsSection.classList.remove('hidden'); // Show TPS actions
+    elements.tpsPreviewSection.classList.remove('hidden');
+
+    // Hide all leveling-related sections
+    elements.statsSection.classList.add('hidden');
+    elements.previewSection.classList.add('hidden');
+    elements.analysisSection.classList.add('hidden');
+    elements.actionsSection.classList.add('hidden'); // Hide levelling actions
+}
+        function showCalibrationOnly() {
+            if (!parser || !parser.calibrationInfo.isCalibration) return;
+            
+            const endLineMatch = parser.calibrationInfo.recordRange.match(/to\s(\d+)/);
+            // Updated regex to handle both "Records X to Y" and "Lines X to Y"
+            const startLineMatch = parser.calibrationInfo.recordRange.match(/(?:Records|Lines)\s(\d+)/i);
+            const startLine = startLineMatch ? parseInt(startLineMatch[1]) : 1;
+
+            if (endLineMatch) {
+                const endLine = parseInt(endLineMatch[1]);
+                
+                parser.data = parser.fullData.filter(rec => rec.lineNumber >= startLine && rec.lineNumber <= endLine);
+                
+                parser.calculateStatsForCurrentData();
+                updateLevelingUI(); 
+                
+                showStatus(`Displaying ${parser.data.length} calibration records only.`, 'info');
+                
+                const formatStatusEl = document.getElementById('formatStatus');
+                const actionsContainer = formatStatusEl.querySelector('#calibration-actions');
+                if (actionsContainer) {
+                    actionsContainer.innerHTML = ''; // Clear old buttons
+                    const showMainBtn = document.createElement('button');
+                    showMainBtn.textContent = '📋 View Main Survey';
+                    showMainBtn.className = 'btn status-action';
+                    showMainBtn.onclick = () => showMainSurveyOnly();
+                    actionsContainer.appendChild(showMainBtn);
+                }
+                
+                elements.outputSection.classList.add('hidden');
+                elements.reportBtn.click();
+            }
+        }
+
+        function showMainSurveyOnly() {
+            if (!parser) return;
+            // Re-run the analysis, which defaults to showing the main survey
+            parser.processAndAnalyze();
+            updateLevelingUI(); 
+            elements.outputSection.classList.add('hidden');
+            elements.reportBtn.click();
+        }
+
+        function showOutput(content, formatName) {
+            currentOutput = content;
+            elements.outputArea.textContent = content;
+            elements.outputSection.classList.remove('hidden');
+            elements.downloadBtn.textContent = `💾 Download ${formatName}`;
+        }
+
+        async function downloadOutput() {
+            if (!currentOutput) return;
+            try {
+                const blob = new Blob([currentOutput], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentFilename}_${currentExtension}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                const originalText = elements.downloadBtn.textContent;
+                elements.downloadBtn.textContent = '✓ Downloaded';
+                setTimeout(() => { elements.downloadBtn.textContent = originalText; }, 2000);
+            } catch (error) {
+                console.error('Download error:', error);
+                showStatus('✗ Download failed', 'error');
+            }
+        }
+
+        async function copyOutput() {
+            if (!currentOutput) return;
+            try {
+                await navigator.clipboard.writeText(currentOutput);
+                const originalText = elements.copyBtn.textContent;
+                elements.copyBtn.textContent = '✓ Copied';
+                setTimeout(() => { elements.copyBtn.textContent = originalText; }, 2000);
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                showStatus('✗ Copy failed', 'error');
+            }
+        }
+
+        window.addEventListener('unhandledrejection', event => {
+            console.error('Unhandled promise rejection:', event.reason);
+            showStatus('✗ An unexpected error occurred.', 'error');
+        });
+        window.addEventListener('error', event => {
+            console.error('Global error:', event.error);
+            showStatus('✗ An unexpected error occurred.', 'error');
+        });
+
+        // Initialize the application when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+    
+    </script>
+    </div>
+    </body>
+    <script src="/js/main.js"></script>
+</body>
+</html>
+
