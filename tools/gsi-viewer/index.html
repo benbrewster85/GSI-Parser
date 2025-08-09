@@ -16,7 +16,6 @@
             <a href="/" class="nav-logo">🛰️ Survey Tools</a>
             <div class="nav-links">
                 <a href="/">Home</a>
-                <a href="/tools/gsi-viewer/">GSI Viewer</a>
                 </div>
         </div>
         <button class="theme-btn" id="themeBtn">🌓</button>
@@ -2163,7 +2162,16 @@ function hideTpsAdvancedSection() {
                 await new Promise(resolve => setTimeout(resolve, 300));
                 
                 parser.updateProcessingOptions(newOptions);
-                updateUI();
+
+                // --- CORRECTED LOGIC ---
+                // Check the file type and call the correct UI update function
+                if (parser.fileType === 'TPS') {
+                    updateTpsUI();
+                } else if (parser.fileType === 'Levelling') {
+                    updateLevelingUI();
+                }
+                // --- END CORRECTION ---
+
                 elements.outputSection.classList.add('hidden'); // Hide old output
                 
                 elements.applyText.textContent = '✓ Applied';
@@ -2183,7 +2191,7 @@ function hideTpsAdvancedSection() {
                 }, 2000);
             }
         }
-
+        
         function processFile(file) {
             resetUI();
             showStatus('Processing...', 'info');
