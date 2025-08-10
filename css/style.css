@@ -629,3 +629,12 @@ tr:hover {
   background: var(--accent);
   color: var(--bg);
 }
+
+.mb-15 {
+  margin-bottom: 15px;
+}
+
+.warning-text {
+  color: #ff9800; /* A clear warning color */
+  font-weight: bold;
+}
