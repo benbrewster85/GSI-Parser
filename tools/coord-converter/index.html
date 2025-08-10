@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>London Survey Grid Conversion Tool</title>
+    <title>Survey Tools - Grid Conversion Tool</title>
     <link rel="stylesheet" href="../../css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body>
     <nav class="global-nav">
@@ -14,7 +15,7 @@
             <a href="/" class="nav-logo">🛰️ Survey Tools</a>
             <div class="nav-links">
                 <a href="/">Home</a>
-                </div>
+            </div>
         </div>
         <button class="theme-btn" id="themeBtn">🌓</button>
     </nav>
@@ -23,126 +24,142 @@
         <main>
             <div class="local-header" style="margin-bottom: 40px;">
                 <div class="local-header-container">
-                    <h2>London Survey Grid Conversion Tools</h2>
+                    <h2>London Survey Grid Conversion Tool</h2>
                     <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
                 </div>
             </div>
+
             <div id="aboutSection" class="section hidden">
-    <div class="advanced-content">
-        <p>This tool provides high-precision, bidirectional coordinate transformations between three major UK survey grids:</p>
-        <ul>
-            <li><strong>OSGB36:</strong> The familiar Ordnance Survey National Grid.</li>
-            <li><strong>ETRS89:</strong> The standard GPS-compatible system for Europe (effectively WGS84).</li>
-            <li><strong>LSG:</strong> The London Survey Grid, used for major infrastructure projects.</li>
-        </ul>
-        <p>The transformations are based on the official OSTN15 model from Ordnance Survey and the 7-parameter Helmert transformation specified by Transport for London for the LSG. This ensures the highest possible accuracy for engineering and survey applications.</p>
-        <p class="warning-text">This tool is still under development. Use with caution and check all results before use.</p>
-    </div>
-</div>
+                <div class="advanced-content">
+                    <p>This tool provides high-precision, bidirectional coordinate transformations between three major UK survey grids:</p>
+                    <ul>
+                        <li><strong>OSGB36:</strong> The familiar Ordnance Survey National Grid.</li>
+                        <li><strong>ETRS89:</strong> The standard GPS-compatible system for Europe (effectively WGS84).</li>
+                        <li><strong>LSG 2025:</strong> The London Survey Grid, used for major infrastructure projects.</li>
+                    </ul>
+                    <p>The transformations are based on the official OSTN15 model from Ordnance Survey and the 7-parameter Helmert transformation specified by Transport for London for the LSG (2025).</p>
+                    <P>Please consult the Transport for London lead Surveyor for more information on LSG.</P>
+                    <p class="warning-text">This tool is still under development. Use with caution and check all results before use.</p>
+                </div>
+            </div>
 
             <div class="section">
                 <div class="advanced-grid">
-    <div class="advanced-group">
-        <h4>1. Select Input System</h4>
-        <div id="mode-selector">
-            <label class="checkbox-label">
-                <input type="radio" name="conversion-mode" value="osgb" checked>
-                OSGB36
-            </label>
-            <label class="checkbox-label">
-                <input type="radio" name="conversion-mode" value="etrs">
-                ETRS89
-            </label>
-            <label class="checkbox-label">
-                <input type="radio" name="conversion-mode" value="lsg">
-                LSG
-            </label>
-        </div>
-
-        <h4 style="margin-top: 20px;">2. Enter Input Coordinates</h4>
-        
-        <form id="osgb-form">
-            <div class="advanced-grid" style="gap: 15px;">
-                <div>
-                    <label for="easting" class="form-label">OSGB36 Easting (E)</label>
-                    <input type="number" id="easting" class="form-input" placeholder="e.g., 651409.804" step="any">
-                </div>
-                <div>
-                    <label for="northing" class="form-label">OSGB36 Northing (N)</label>
-                    <input type="number" id="northing" class="form-input" placeholder="e.g., 313177.270" step="any">
-                </div>
-            </div>
-            <div class="mb-15">
-                <label for="osgb-height" class="form-label">OSGB36 Height (m)</label>
-                <input type="number" id="osgb-height" class="form-input" placeholder="Orthometric (Newlyn)" step="any">
-            </div>
-            <button type="submit" class="btn primary" id="convert-btn" disabled>Convert</button>
-            <p id="status-text" class="help-text" style="margin-top: 10px;">Loading...</p>
-        </form>
-
-        <form id="etrs-form" style="display: none;">
-             <div class="advanced-grid" style="gap: 15px;">
-                <div>
-                    <label for="latitude" class="form-label">ETRS89 Latitude</label>
-                    <input type="number" id="latitude" class="form-input" placeholder="e.g., 52.65800783" step="any">
-                </div>
-                 <div>
-                    <label for="longitude" class="form-label">ETRS89 Longitude</label>
-                    <input type="number" id="longitude" class="form-input" placeholder="e.g., 1.71607397" step="any">
-                </div>
-            </div>
-             <div class="mb-15">
-                <label for="etrs-height" class="form-label">ETRS89 Height (m)</label>
-                <input type="number" id="etrs-height" class="form-input" placeholder="Ellipsoidal" step="any">
-            </div>
-        </form>
-
-        <form id="lsg-form" style="display: none;">
-            <div class="advanced-grid" style="gap: 15px;">
-                <div>
-                    <label for="lsg-easting" class="form-label">LSG Easting (E)</label>
-                    <input type="number" id="lsg-easting" class="form-input" step="any">
-                </div>
-                <div>
-                    <label for="lsg-northing" class="form-label">LSG Northing (N)</label>
-                    <input type="number" id="lsg-northing" class="form-input" step="any">
-                </div>
-            </div>
-            <div class="mb-15">
-                <label for="lsg-height" class="form-label">LSG Height (m)</label>
-                <input type="number" id="lsg-height" class="form-input" placeholder="Orthometric (LSGH)" step="any">
-            </div>
-        </form>
-        
-    </div>
-    <div class="advanced-group">
-        <h4>3. Results</h4>
-        <div id="result-container" class="output" style="display: none; min-height: 250px;">
-            <p><strong>OSGB36:</strong> <span id="result-osgb-e"></span> (E), <span id="result-osgb-n"></span> (N), <span id="result-osgb-h"></span> (H)</p>
-            <p><strong>ETRS89:</strong> <span id="result-etrs-lat"></span> (Lat), <span id="result-etrs-lon"></span> (Lon), <span id="result-etrs-h"></span> (h)</p>
-            <p><strong>LSG:</strong> <span id="result-lsg-e"></span> (E), <span id="result-lsg-n"></span> (N), <span id="result-lsg-h"></span> (H)</p>
-        </div>
-        <div id="spinner" class="loading-spinner" style="display: none; margin: 20px auto;"></div>
-    </div>
-        
-
-    
-
-    <div class="advanced-group">
-        
-        <div id="spinner" class="loading-spinner" style="display: none; margin: 20px auto;"></div>
-    </div>
+                    <div class="advanced-group"> <h4>1. Select Input System</h4>
+                        <div id="mode-selector">
+                            <label class="checkbox-label">
+                                <input type="radio" name="conversion-mode" value="osgb" checked> OSGB36
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="conversion-mode" value="etrs"> ETRS89
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="conversion-mode" value="lsg"> LSG 2025
+                            </label>
+                        </div>
+                        <div class="actions">
+    <button class="btn primary" id="upload-btn">📤 Upload CSV</button>
+    <button class="btn" id="clear-btn">Clear Results</button>
+    <button class="btn" id="download-btn" disabled>📥 Download Results</button>
 </div>
+<input type="file" id="csv-input" accept=".csv" style="display: none;">
+
+
+                        <h4 style="margin-top: 20px;">2. Enter Input Coordinates</h4>
+                        
+                        <form id="osgb-form">
+                            <div class="advanced-grid" style="gap: 15px;">
+                                <div>
+                                    <label for="easting" class="form-label">OSGB36 Easting (E)</label>
+                                    <input type="number" id="easting" class="form-input" placeholder="e.g., 531977.531" step="any">
+                                </div>
+                                <div>
+                                    <label for="northing" class="form-label">OSGB36 Northing (N)</label>
+                                    <input type="number" id="northing" class="form-input" placeholder="e.g., 179606.720" step="any">
+                                </div>
+                            </div>
+                            <div class="mb-15">
+                                <label for="osgb-height" class="form-label">OSGB36 Height (m)</label>
+                                <input type="number" id="osgb-height" class="form-input" placeholder="Orthometric (Newlyn)" step="any">
+                            </div>
+                            <button type="submit" class="btn primary" id="convert-btn" disabled>Convert</button>
+                            <p id="status-text" class="help-text" style="margin-top: 10px;">Loading...</p>
+                        </form>
+
+                        <form id="etrs-form" style="display: none;">
+                            <div class="advanced-grid" style="gap: 15px;">
+                                <div>
+                                    <label for="latitude" class="form-label">ETRS89 Latitude</label>
+                                    <input type="number" id="latitude" class="form-input" placeholder="e.g., 51.50000000" step="any">
+                                </div>
+                                <div>
+                                    <label for="longitude" class="form-label">ETRS89 Longitude</label>
+                                    <input type="number" id="longitude" class="form-input" placeholder="e.g., -0.10000000" step="any">
+                                </div>
+                            </div>
+                            <div class="mb-15">
+                                <label for="etrs-height" class="form-label">ETRS89 Height (m)</label>
+                                <input type="number" id="etrs-height" class="form-input" placeholder="Ellipsoidal" step="any">
+                            </div>
+                        </form>
+
+                        <form id="lsg-form" style="display: none;">
+                            <div class="advanced-grid" style="gap: 15px;">
+                                <div>
+                                    <label for="lsg-easting" class="form-label">LSG Easting (E)</label>
+                                    <input type="number" id="lsg-easting" class="form-input" placeholder="e.g., 82276.112" step="any">
+                                </div>
+                                <div>
+                                    <label for="lsg-northing" class="form-label">LSG Northing (N)</label>
+                                    <input type="number" id="lsg-northing" class="form-input" placeholder="e.g., 34318.132" step="any">
+                                </div>
+                            </div>
+                            <div class="mb-15">
+                                <label for="lsg-height" class="form-label">LSG Height (m)</label>
+                                <input type="number" id="lsg-height" class="form-input" placeholder="Orthometric (LSGH)" step="any">
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="advanced-group"> <h4>3. Map View</h4>
+                        <div id="map" style="height: 100%; min-height: 435px;"></div>
+                    </div>
+                </div>
             </div>
-             
+
+            <div class="section"> <h4>4. Results</h4>
+                <div id="result-container" class="data-table" style="display: none;">
+                    <table>
+                       <thead>
+    <tr>
+        <th>Point ID</th>
+        <th>OSGB36 E</th>
+        <th>OSGB36 N</th>
+        <th>OSGB36 H</th>
+        <th>ETRS89 Lat</th>
+        <th>ETRS89 Lon</th>
+        <th>ETRS89 h</th>
+        <th>LSG E</th>
+        <th>LSG N</th>
+        <th>LSG H</th>
+    </tr>
+</thead>
+                        <tbody id="result-tbody">
+                            </tbody>
+                    </table>
+                </div>
+                <div id="spinner" class="loading-spinner" style="display: none; margin: 20px auto;"></div>
+            </div>
         </main>
     </div>
+
     <div class="footer">
         Created by B Brewster • © 2025
     </div>
 
-<script src="../../js/main.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="converter.js"></script>
+    <script src="../../js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="converter.js"></script>
 </body>
 </html>

@@ -4,8 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------------------
     // --- 1. CONSTANTS, VARIABLES, and UI ELEMENT SELECTORS ---
     // --------------------------------------------------------------------
+    let map;
+    let marker;
+    let markers = [];
     const ostn15Data = [];
     const GRID_WIDTH = 701;
+    let pointCounter = 1;
 
     const ELLIPSOID_PARAMS = {
         GRS80: { a: 6378137.0, b: 6356752.3141 },
@@ -19,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ETRS89_to_LSG: { tx: 19.019, ty: 115.122, tz: -97.287, s: 18.60847540 / 1000000, rx: -3.577824, ry: 3.484437, rz: 2.767646 }
     };
 
-    // UI Element Selectors
     const modeSelector = document.getElementById('mode-selector');
     const osgbForm = document.getElementById('osgb-form');
     const etrsForm = document.getElementById('etrs-form');
@@ -28,18 +31,140 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = document.getElementById('status-text');
     const spinner = document.getElementById('spinner');
     const resultContainer = document.getElementById('result-container');
+    const resultTbody = document.getElementById('result-tbody');
+    const mapContainer = document.getElementById('map');
     const osgbEastingInput = document.getElementById('easting'), osgbNorthingInput = document.getElementById('northing'), osgbHeightInput = document.getElementById('osgb-height');
     const etrsLatInput = document.getElementById('latitude'), etrsLonInput = document.getElementById('longitude'), etrsHeightInput = document.getElementById('etrs-height');
     const lsgEastingInput = document.getElementById('lsg-easting'), lsgNorthingInput = document.getElementById('lsg-northing'), lsgHeightInput = document.getElementById('lsg-height');
-    const resultOsgbE = document.getElementById('result-osgb-e'), resultOsgbN = document.getElementById('result-osgb-n'), resultOsgbH = document.getElementById('result-osgb-h');
-    const resultEtrsLat = document.getElementById('result-etrs-lat'), resultEtrsLon = document.getElementById('result-etrs-lon'), resultEtrsH = document.getElementById('result-etrs-h');
-    const resultLsgE = document.getElementById('result-lsg-e'), resultLsgN = document.getElementById('result-lsg-n'), resultLsgH = document.getElementById('result-lsg-h');
     const aboutBtn = document.getElementById('aboutBtn');
     const aboutSection = document.getElementById('aboutSection');
+    const uploadBtn = document.getElementById('upload-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const csvInput = document.getElementById('csv-input');
+    //
     
     // --------------------------------------------------------------------
     // --- 2. FUNCTION DEFINITIONS ---
     // --------------------------------------------------------------------
+
+    /**
+ * Handles the uploaded CSV file, parsing and converting each row.
+ */
+function handleFile(file) {
+    const selectedMode = document.querySelector('input[name="conversion-mode"]:checked').value;
+    const allResults = [];
+    /**
+ * Clears old markers and displays a new set of points on the map, fitting the view to them.
+ * @param {Array<object>} points - An array of result objects, each with latitude and longitude.
+ */
+function updateMapWithMultiplePoints(points) {
+    // Clear any existing markers from the map
+    markers.forEach(marker => marker.remove());
+    markers = [];
+
+    if (points.length === 0) return;
+
+    // Create a new marker for each point
+    points.forEach(point => {
+        const marker = L.marker([point.latitude, point.longitude]);
+        markers.push(marker);
+    });
+
+    // Create a feature group from the markers to easily get their bounds
+    const featureGroup = L.featureGroup(markers).addTo(map);
+
+    // Tell the map to zoom and pan to fit all the markers in the view
+    map.fitBounds(featureGroup.getBounds().pad(0.1)); // pad adds a small margin
+}
+
+    // Clear previous results and reset the state
+    resultTbody.innerHTML = '';
+    spinner.style.display = 'block';
+    resultContainer.style.display = 'none';
+    downloadBtn.disabled = true;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        worker: true,
+        // This function is called for each row in the CSV
+        step: (results) => {
+            const row = results.data;
+            let finalResult = null;
+            let inputRow = {};
+            
+            // Get the Point ID from the CSV column. Note the space in 'Point ID'.
+            const pointId = row['Point ID'] || 'N/A';
+
+            // Map CSV headers to input variables based on selected mode
+            switch(selectedMode) {
+                case 'osgb':
+                    inputRow = { E_osgb: parseFloat(row.Easting), N_osgb: parseFloat(row.Northing), H_osgb: parseFloat(row.Height) || 0 };
+                    break;
+                case 'etrs':
+                    inputRow = { lat: parseFloat(row.Latitude), lon: parseFloat(row.Longitude), H_etrs: parseFloat(row.Height) || 0 };
+                    break;
+                case 'lsg':
+                     inputRow = { E_lsg: parseFloat(row.Easting), N_lsg: parseFloat(row.Northing), H_lsg: parseFloat(row.Height) || 0 };
+                    break;
+            }
+            
+            // Re-run the same conversion logic from the manual input handler
+            // Note: This logic can be refactored into a shared 'convertPoint' function later
+            // For now, we'll keep it explicit to ensure it works.
+            switch (selectedMode) {
+                case 'osgb':
+                    const { E_osgb, N_osgb, H_osgb } = inputRow;
+                    if (isNaN(E_osgb) || isNaN(N_osgb)) break;
+                    const etrsProjected = iterativeTransform(E_osgb, N_osgb);
+                    if (etrsProjected) {
+                        const shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
+                        if (shifts) {
+                            const H_etrs = H_osgb + shifts.sh;
+                            const geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                            const etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
+                            const lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                            const lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
+                            const lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                            const H_lsg = H_osgb + 100.0;
+                            finalResult = { E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                        }
+                    }
+                    break;
+                // Add similar full logic for 'etrs' and 'lsg' cases here if you need CSV upload for them.
+            }
+
+            if (finalResult) {
+                allResults.push(finalResult); // Add the result to our array
+                const resultRowHTML = `
+                    <tr>
+                        <td>${pointId}</td>
+                        <td>${finalResult.E_osgb.toFixed(3)}</td>
+                        <td>${finalResult.N_osgb.toFixed(3)}</td>
+                        <td>${finalResult.H_osgb.toFixed(3)}</td>
+                        <td>${finalResult.latitude.toFixed(8)}</td>
+                        <td>${finalResult.longitude.toFixed(8)}</td>
+                        <td>${finalResult.H_etrs.toFixed(3)}</td>
+                        <td>${finalResult.lsgE.toFixed(3)}</td>
+                        <td>${finalResult.lsgN.toFixed(3)}</td>
+                        <td>${finalResult.H_lsg.toFixed(3)}</td>
+                    </tr>`;
+                resultTbody.innerHTML += resultRowHTML;
+            }
+        },
+        // This function is called when the entire file is processed
+        complete: () => {
+            spinner.style.display = 'none';
+            resultContainer.style.display = 'block';
+            if (allResults.length > 0) {
+                 downloadBtn.disabled = false;
+                 updateMapWithMultiplePoints(allResults); // Update the map with all points
+            }
+            console.log("CSV processing complete.");
+        }
+    });
+}
 
     function getShifts(x, y) {
         const east_idx = Math.floor(x / 1000), north_idx = Math.floor(y / 1000), id0 = (north_idx * GRID_WIDTH) + east_idx;
@@ -149,6 +274,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const z_out = scaleFactor * (-ry_rad * x_temp + rx_rad * y_temp + z_temp);
         return { x: x_out, y: y_out, z: z_out };
     }
+
+    function initMap() {
+    // Check if the map is already initialized
+    if (map) return;
+        // Set the new initial view to Charing Cross with a closer zoom
+        map = L.map('map').setView([51.5074, -0.1278], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+}
     
     function handleMasterConversion(event) {
         event.preventDefault();
@@ -168,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     etrsProjected = iterativeTransform(E_osgb, N_osgb);
                     if (etrsProjected) {
                         shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
+                        if (shifts) {
                         H_etrs = H_osgb + shifts.sh;
                         geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                         etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
@@ -176,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
                         H_lsg = H_osgb + 100.0;
                         finalResult = { E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                        }
                     }
                     break;
                 case 'etrs':
@@ -215,29 +353,123 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     break;
             }
+            
 
             spinner.style.display = 'none';
+            
             if (finalResult) {
-                resultOsgbE.textContent = finalResult.E_osgb.toFixed(3); resultOsgbN.textContent = finalResult.N_osgb.toFixed(3); resultOsgbH.textContent = finalResult.H_osgb.toFixed(3);
-                resultEtrsLat.textContent = finalResult.latitude.toFixed(8); resultEtrsLon.textContent = finalResult.longitude.toFixed(8); resultEtrsH.textContent = finalResult.H_etrs.toFixed(3);
-                resultLsgE.textContent = finalResult.lsgE.toFixed(3); resultLsgN.textContent = finalResult.lsgN.toFixed(3); resultLsgH.textContent = finalResult.H_lsg.toFixed(3);
-                resultContainer.style.display = 'block';
-            } else {
-                alert("Calculation failed or coordinate is outside the supported transformation area.");
+                if (pointCounter === 1) {
+    resultTbody.innerHTML = '';
+                }
+                const resultRowHTML = `
+        <tr>
+            <td>${pointCounter}</td>
+            <td>${finalResult.E_osgb.toFixed(3)}</td>
+            <td>${finalResult.N_osgb.toFixed(3)}</td>
+            <td>${finalResult.H_osgb.toFixed(3)}</td>
+            <td>${finalResult.latitude.toFixed(8)}</td>
+            <td>${finalResult.longitude.toFixed(8)}</td>
+            <td>${finalResult.H_etrs.toFixed(3)}</td>
+            <td>${finalResult.lsgE.toFixed(3)}</td>
+            <td>${finalResult.lsgN.toFixed(3)}</td>
+            <td>${finalResult.H_lsg.toFixed(3)}</td>
+        </tr>`;
+                resultTbody.innerHTML = resultRowHTML;
+    resultContainer.style.display = 'block';
+    pointCounter++;
+
+    // --- MAP UPDATE LOGIC (remains the same) ---
+    const mapLat = finalResult.latitude;
+    const mapLon = finalResult.longitude;
+    map.invalidateSize();
+    if (!marker) {
+        marker = L.marker([mapLat, mapLon]).addTo(map);
+    } else {
+        marker.setLatLng([mapLat, mapLon]);
+    }
+    map.setView([mapLat, mapLon], 15);
+
+} else {
+    alert("Calculation failed or coordinate is outside the supported transformation area.");
             }
         }, 50);
+}
+
+function downloadResults() {
+        const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";
+        let csvContent = headers + "\r\n";
+
+        // Loop through the rows of the results table
+        for (const row of resultTbody.rows) {
+            const cells = Array.from(row.cells).map(cell => cell.textContent);
+            csvContent += cells.join(',') + "\r\n";
+        }
+
+        // Create a file and trigger the download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        if (link.download !== undefined) { // feature detection
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "converted_results.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
     
     // --------------------------------------------------------------------
     // --- 3. EVENT LISTENERS AND INITIALIZATION ---
     // --------------------------------------------------------------------
     
+    uploadBtn.addEventListener('click', () => {
+    csvInput.value = ''; // Clear previous selection
+    csvInput.click(); // Trigger the hidden file input
+});
+
+csvInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        handleFile(file);
+    }
+});
+
+clearBtn.addEventListener('click', () => {
+    // Clear the table and reset state (existing logic)
+    resultTbody.innerHTML = '';
+    pointCounter = 1;
+    resultContainer.style.display = 'none';
+    downloadBtn.disabled = true;
+
+    // --- NEW LOGIC TO RESET THE MAP COMPLETELY ---
+
+    // 1. Remove the single marker (from manual conversions) if it exists
+    if (marker) {
+        marker.remove();
+        marker = null;
+    }
+
+    // 2. Remove all CSV markers (from bulk conversions) if they exist
+    if (markers.length > 0) {
+        markers.forEach(m => m.remove());
+        markers = []; // Reset the array
+    }
+
+    // 3. Reset the map's view to the original London center and zoom
+    map.setView([51.5074, -0.1278], 9);
+});
+
     aboutBtn.addEventListener('click', () => {
         aboutSection.classList.toggle('hidden');
         aboutBtn.textContent = aboutSection.classList.contains('hidden') ? 'About This Tool' : 'Hide About Section';
     });
 
+    downloadBtn.addEventListener('click', downloadResults);
+
     modeSelector.addEventListener('change', (event) => {
+        pointCounter = 1;
+        resultTbody.innerHTML = ''; // Clear previous results
         const selectedMode = event.target.value;
         osgbForm.style.display = 'none'; etrsForm.style.display = 'none'; lsgForm.style.display = 'none';
         let activeForm = osgbForm;
@@ -271,6 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             osgbForm.addEventListener('submit', handleMasterConversion);
             etrsForm.addEventListener('submit', handleMasterConversion);
             lsgForm.addEventListener('submit', handleMasterConversion);
+            initMap();
         },
         error: error => {
             console.error("ERROR: Papa Parse 'error' callback fired.", error);

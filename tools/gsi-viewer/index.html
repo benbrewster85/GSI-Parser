@@ -2475,17 +2475,17 @@ function hideTpsAdvancedSection() {
                                     <td class="numeric" style="width: 15%;"></td>
                                 </tr>
                                 <tr id="${l2_faceI_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
-                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <thead><tr><th style="width: 10%;">Obs #</th><th class="numeric" style="width: 25%;">Raw Hz</th><th class="numeric" style="width: 25%;">Raw V</th><th class="numeric" style="width: 25%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
                                     <tbody>
                                         ${faceI.rawObservations.map(rawObs => `
                                             <tr>
-                                                <td></td><td></td>
+                                                <td class="numeric">${rawObs.lineNumber}</td>
                                                 <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
                                                 <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
                                                 <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
                                                 <td></td>
                                             </tr>`).join('')}
-                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                        <tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
                                             <strong>Spread Check:</strong>
                                             Hz: ${faceI.qa.spread.values.hzRange?.toFixed(1)}" |
                                             V: ${faceI.qa.spread.values.vaRange?.toFixed(1)}" |
@@ -2509,17 +2509,17 @@ function hideTpsAdvancedSection() {
                                     <td class="numeric" style="width: 15%;"></td>
                                 </tr>
                                 <tr id="${l2_faceII_id}" class="details-row hidden"><td colspan="6"><div class="details-container"><table>
-                                    <thead><tr><th style="width: 25%;"></th><th style="width: 15%;"></th><th class="numeric" style="width: 15%;">Raw Hz</th><th class="numeric" style="width: 15%;">Raw V</th><th class="numeric" style="width: 15%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
+                                    <thead><tr><th style="width: 10%;">Obs #</th><th class="numeric" style="width: 25%;">Raw Hz</th><th class="numeric" style="width: 25%;">Raw V</th><th class="numeric" style="width: 25%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
                                     <tbody>
                                         ${faceII.rawObservations.map(rawObs => `
                                             <tr>
-                                                <td></td><td></td>
+                                                <td class="numeric">${rawObs.lineNumber}</td>
                                                 <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
                                                 <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
                                                 <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
                                                 <td></td>
                                             </tr>`).join('')}
-                                        <tr><td colspan="6" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+                                        <tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
                                             <strong>Spread Check:</strong>
                                             Hz: ${faceII.qa.spread.values.hzRange?.toFixed(1)}" |
                                             V: ${faceII.qa.spread.values.vaRange?.toFixed(1)}" |
@@ -2539,7 +2539,7 @@ function hideTpsAdvancedSection() {
                                     <strong style="float: right;">Status: ${faceCheck.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
                                 </td></tr>`;
                         }
-                        l1_html += '</table></div></td>';
+                        l1_html += '</tbody></table></div></td>';
                         detailsRow.innerHTML = l1_html;
                         elements.tpsDataTable.appendChild(summaryRow);
                         elements.tpsDataTable.appendChild(detailsRow);

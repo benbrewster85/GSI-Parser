@@ -182,6 +182,7 @@ body {
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 30px;
+  margin-top: 30px;
 }
 
 .numeric {
@@ -632,6 +633,20 @@ tr:hover {
 
 .mb-15 {
   margin-bottom: 15px;
+}
+
+.warning-text {
+  color: #ff9800; /* A clear warning color */
+  font-weight: bold;
+}
+
+#map {
+  height: 400px;
+  width: 100%;
+  margin-top: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
 }
 
 .warning-text {
