@@ -653,3 +653,7 @@ tr:hover {
   color: #ff9800; /* A clear warning color */
   font-weight: bold;
 }
+
+.about-content {
+  margin-top: 40px;
+}
