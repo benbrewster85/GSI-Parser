@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ETRS89_to_LSG: { tx: 19.019, ty: 115.122, tz: -97.287, s: 18.60847540 / 1000000, rx: -3.577824, ry: 3.484437, rz: 2.767646 }
     };
 
+    // UI Element Selectors
     const modeSelector = document.getElementById('mode-selector');
     const osgbForm = document.getElementById('osgb-form');
     const etrsForm = document.getElementById('etrs-form');
@@ -42,129 +43,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearBtn = document.getElementById('clear-btn');
     const downloadBtn = document.getElementById('download-btn');
     const csvInput = document.getElementById('csv-input');
-    //
     
     // --------------------------------------------------------------------
     // --- 2. FUNCTION DEFINITIONS ---
     // --------------------------------------------------------------------
 
-    /**
- * Handles the uploaded CSV file, parsing and converting each row.
- */
-function handleFile(file) {
-    const selectedMode = document.querySelector('input[name="conversion-mode"]:checked').value;
-    const allResults = [];
-    /**
- * Clears old markers and displays a new set of points on the map, fitting the view to them.
- * @param {Array<object>} points - An array of result objects, each with latitude and longitude.
- */
-function updateMapWithMultiplePoints(points) {
-    // Clear any existing markers from the map
-    markers.forEach(marker => marker.remove());
-    markers = [];
+    function initMap() {
+        if (map) return;
+        map = L.map('map').setView([51.5074, -0.1278], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+    }
 
-    if (points.length === 0) return;
-
-    // Create a new marker for each point
-    points.forEach(point => {
-        const marker = L.marker([point.latitude, point.longitude]);
-        markers.push(marker);
-    });
-
-    // Create a feature group from the markers to easily get their bounds
-    const featureGroup = L.featureGroup(markers).addTo(map);
-
-    // Tell the map to zoom and pan to fit all the markers in the view
-    map.fitBounds(featureGroup.getBounds().pad(0.1)); // pad adds a small margin
-}
-
-    // Clear previous results and reset the state
-    resultTbody.innerHTML = '';
-    spinner.style.display = 'block';
-    resultContainer.style.display = 'none';
-    downloadBtn.disabled = true;
-
-    Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        worker: true,
-        // This function is called for each row in the CSV
-        step: (results) => {
-            const row = results.data;
-            let finalResult = null;
-            let inputRow = {};
-            
-            // Get the Point ID from the CSV column. Note the space in 'Point ID'.
-            const pointId = row['Point ID'] || 'N/A';
-
-            // Map CSV headers to input variables based on selected mode
-            switch(selectedMode) {
-                case 'osgb':
-                    inputRow = { E_osgb: parseFloat(row.Easting), N_osgb: parseFloat(row.Northing), H_osgb: parseFloat(row.Height) || 0 };
-                    break;
-                case 'etrs':
-                    inputRow = { lat: parseFloat(row.Latitude), lon: parseFloat(row.Longitude), H_etrs: parseFloat(row.Height) || 0 };
-                    break;
-                case 'lsg':
-                     inputRow = { E_lsg: parseFloat(row.Easting), N_lsg: parseFloat(row.Northing), H_lsg: parseFloat(row.Height) || 0 };
-                    break;
+    function updateMapWithPoints(points) {
+        if (marker) marker.remove();
+        markers.forEach(m => m.remove());
+        markers = [];
+        marker = null;
+        if (!points || points.length === 0) return;
+        if (points.length === 1) {
+            const point = points[0];
+            if (point.latitude && point.longitude) {
+                marker = L.marker([point.latitude, point.longitude]).addTo(map);
+                map.setView([point.latitude, point.longitude], 15);
             }
-            
-            // Re-run the same conversion logic from the manual input handler
-            // Note: This logic can be refactored into a shared 'convertPoint' function later
-            // For now, we'll keep it explicit to ensure it works.
-            switch (selectedMode) {
-                case 'osgb':
-                    const { E_osgb, N_osgb, H_osgb } = inputRow;
-                    if (isNaN(E_osgb) || isNaN(N_osgb)) break;
-                    const etrsProjected = iterativeTransform(E_osgb, N_osgb);
-                    if (etrsProjected) {
-                        const shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
-                        if (shifts) {
-                            const H_etrs = H_osgb + shifts.sh;
-                            const geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
-                            const etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
-                            const lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
-                            const lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
-                            const lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                            const H_lsg = H_osgb + 100.0;
-                            finalResult = { E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
-                        }
-                    }
-                    break;
-                // Add similar full logic for 'etrs' and 'lsg' cases here if you need CSV upload for them.
-            }
-
-            if (finalResult) {
-                allResults.push(finalResult); // Add the result to our array
-                const resultRowHTML = `
-                    <tr>
-                        <td>${pointId}</td>
-                        <td>${finalResult.E_osgb.toFixed(3)}</td>
-                        <td>${finalResult.N_osgb.toFixed(3)}</td>
-                        <td>${finalResult.H_osgb.toFixed(3)}</td>
-                        <td>${finalResult.latitude.toFixed(8)}</td>
-                        <td>${finalResult.longitude.toFixed(8)}</td>
-                        <td>${finalResult.H_etrs.toFixed(3)}</td>
-                        <td>${finalResult.lsgE.toFixed(3)}</td>
-                        <td>${finalResult.lsgN.toFixed(3)}</td>
-                        <td>${finalResult.H_lsg.toFixed(3)}</td>
-                    </tr>`;
-                resultTbody.innerHTML += resultRowHTML;
-            }
-        },
-        // This function is called when the entire file is processed
-        complete: () => {
-            spinner.style.display = 'none';
-            resultContainer.style.display = 'block';
-            if (allResults.length > 0) {
-                 downloadBtn.disabled = false;
-                 updateMapWithMultiplePoints(allResults); // Update the map with all points
-            }
-            console.log("CSV processing complete.");
+            return;
         }
-    });
-}
+        points.forEach(point => {
+            if (point.latitude && point.longitude) {
+                const newMarker = L.marker([point.latitude, point.longitude]);
+                markers.push(newMarker);
+            }
+        });
+        if (markers.length > 0) {
+            const featureGroup = L.featureGroup(markers).addTo(map);
+            map.fitBounds(featureGroup.getBounds().pad(0.1));
+        }
+    }
+
+    function downloadResults() {
+        const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";
+        let csvContent = headers + "\r\n";
+        for (const row of resultTbody.rows) {
+            const cells = Array.from(row.cells).map(cell => `"${cell.textContent}"`);
+            csvContent += cells.join(',') + "\r\n";
+        }
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "converted_results.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 
     function getShifts(x, y) {
         const east_idx = Math.floor(x / 1000), north_idx = Math.floor(y / 1000), id0 = (north_idx * GRID_WIDTH) + east_idx;
@@ -274,17 +209,6 @@ function updateMapWithMultiplePoints(points) {
         const z_out = scaleFactor * (-ry_rad * x_temp + rx_rad * y_temp + z_temp);
         return { x: x_out, y: y_out, z: z_out };
     }
-
-    function initMap() {
-    // Check if the map is already initialized
-    if (map) return;
-        // Set the new initial view to Charing Cross with a closer zoom
-        map = L.map('map').setView([51.5074, -0.1278], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
-}
     
     function handleMasterConversion(event) {
         event.preventDefault();
@@ -305,14 +229,14 @@ function updateMapWithMultiplePoints(points) {
                     if (etrsProjected) {
                         shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
                         if (shifts) {
-                        H_etrs = H_osgb + shifts.sh;
-                        geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
-                        etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
-                        lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
-                        lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
-                        lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                        H_lsg = H_osgb + 100.0;
-                        finalResult = { E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                            H_etrs = H_osgb + shifts.sh;
+                            geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                            etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
+                            lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                            lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
+                            lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                            H_lsg = H_osgb + 100.0;
+                            finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                         }
                     }
                     break;
@@ -328,7 +252,7 @@ function updateMapWithMultiplePoints(points) {
                         lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
                         lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
                         H_lsg = H_osgb + 100.0;
-                        finalResult = { E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                        finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                     }
                     break;
                 case 'lsg':
@@ -348,128 +272,155 @@ function updateMapWithMultiplePoints(points) {
                         shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
                         if (shifts) {
                             E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn;
-                            finalResult = { E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
+                            finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
                         }
                     }
                     break;
             }
-            
 
             spinner.style.display = 'none';
-            
             if (finalResult) {
                 if (pointCounter === 1) {
-    resultTbody.innerHTML = '';
+                    resultTbody.innerHTML = '';
                 }
                 const resultRowHTML = `
-        <tr>
-            <td>${pointCounter}</td>
-            <td>${finalResult.E_osgb.toFixed(3)}</td>
-            <td>${finalResult.N_osgb.toFixed(3)}</td>
-            <td>${finalResult.H_osgb.toFixed(3)}</td>
-            <td>${finalResult.latitude.toFixed(8)}</td>
-            <td>${finalResult.longitude.toFixed(8)}</td>
-            <td>${finalResult.H_etrs.toFixed(3)}</td>
-            <td>${finalResult.lsgE.toFixed(3)}</td>
-            <td>${finalResult.lsgN.toFixed(3)}</td>
-            <td>${finalResult.H_lsg.toFixed(3)}</td>
-        </tr>`;
-                resultTbody.innerHTML = resultRowHTML;
-    resultContainer.style.display = 'block';
-    pointCounter++;
-
-    // --- MAP UPDATE LOGIC (remains the same) ---
-    const mapLat = finalResult.latitude;
-    const mapLon = finalResult.longitude;
-    map.invalidateSize();
-    if (!marker) {
-        marker = L.marker([mapLat, mapLon]).addTo(map);
-    } else {
-        marker.setLatLng([mapLat, mapLon]);
-    }
-    map.setView([mapLat, mapLon], 15);
-
-} else {
-    alert("Calculation failed or coordinate is outside the supported transformation area.");
+                    <tr>
+                        <td>${finalResult.pointId}</td>
+                        <td>${finalResult.E_osgb.toFixed(3)}</td>
+                        <td>${finalResult.N_osgb.toFixed(3)}</td>
+                        <td>${finalResult.H_osgb.toFixed(3)}</td>
+                        <td>${finalResult.latitude.toFixed(8)}</td>
+                        <td>${finalResult.longitude.toFixed(8)}</td>
+                        <td>${finalResult.H_etrs.toFixed(3)}</td>
+                        <td>${finalResult.lsgE.toFixed(3)}</td>
+                        <td>${finalResult.lsgN.toFixed(3)}</td>
+                        <td>${finalResult.H_lsg.toFixed(3)}</td>
+                    </tr>`;
+                resultTbody.innerHTML = resultRowHTML; // This should be += for CSV
+                resultContainer.style.display = 'block';
+                pointCounter++;
+                updateMapWithPoints([finalResult]);
+            } else {
+                alert("Calculation failed or coordinate is outside the supported transformation area.");
             }
         }, 50);
-}
-
-function downloadResults() {
-        const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";
-        let csvContent = headers + "\r\n";
-
-        // Loop through the rows of the results table
-        for (const row of resultTbody.rows) {
-            const cells = Array.from(row.cells).map(cell => cell.textContent);
-            csvContent += cells.join(',') + "\r\n";
-        }
-
-        // Create a file and trigger the download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        if (link.download !== undefined) { // feature detection
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "converted_results.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
     }
-    
+
+    function handleFile(file) {
+        const selectedMode = document.querySelector('input[name="conversion-mode"]:checked').value;
+        const allResults = [];
+        resultTbody.innerHTML = '';
+        spinner.style.display = 'block';
+        resultContainer.style.display = 'none';
+        downloadBtn.disabled = true;
+
+        Papa.parse(file, {
+            header: true, skipEmptyLines: true, worker: true,
+            step: (results) => {
+                const row = results.data;
+                let E_osgb, N_osgb, H_osgb, lat, lon, H_etrs, E_lsg, N_lsg, H_lsg;
+                let finalResult = null;
+                let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected;
+                const pointId = row['Point ID'] || 'N/A';
+
+                switch (selectedMode) {
+                    case 'osgb':
+                        E_osgb = parseFloat(row.Easting); N_osgb = parseFloat(row.Northing); H_osgb = parseFloat(row.Height) || 0;
+                        if (isNaN(E_osgb) || isNaN(N_osgb)) return;
+                        etrsProjected = iterativeTransform(E_osgb, N_osgb);
+                        if (etrsProjected) {
+                            shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
+                            if(shifts) {
+                               H_etrs = H_osgb + shifts.sh;
+                               geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                               etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
+                               lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                               lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
+                               lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                               H_lsg = H_osgb + 100.0;
+                               finalResult = { pointId, E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                            }
+                        }
+                        break;
+                    case 'etrs':
+                        lat = parseFloat(row.Latitude); lon = parseFloat(row.Longitude); H_etrs = parseFloat(row.Height) || 0;
+                        if (isNaN(lat) || isNaN(lon)) return;
+                        etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                        shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
+                        if (shifts) {
+                            E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn; H_osgb = H_etrs - shifts.sh;
+                            etrsCartesian = geodeticToCartesian(lat, lon, H_etrs, ELLIPSOID_PARAMS.WGS84);
+                            lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                            lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
+                            lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                            H_lsg = H_osgb + 100.0;
+                            finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
+                        }
+                        break;
+                    case 'lsg':
+                        E_lsg = parseFloat(row.Easting); N_lsg = parseFloat(row.Northing); H_lsg = parseFloat(row.Height) || 0;
+                        if (isNaN(E_lsg) || isNaN(N_lsg)) return;
+                        H_osgb = H_lsg - 100.0;
+                        lsgGeo = convertProjectedToGeodetic(E_lsg, N_lsg, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                        const tempETRSforShift = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                        const tempShifts = getShifts(tempETRSforShift.x_proj, tempETRSforShift.y_proj);
+                        if (tempShifts) {
+                            const approx_h_etrs = H_osgb + tempShifts.sh;
+                            lsgCartesian = geodeticToCartesian(lsgGeo.latitude, lsgGeo.longitude, approx_h_etrs, ELLIPSOID_PARAMS.WGS84);
+                            etrsCartesian = inverseHelmertTransform(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                            geoETRS = cartesianToGeodetic(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, ELLIPSOID_PARAMS.GRS80);
+                            lat = geoETRS.latitude; lon = geoETRS.longitude; H_etrs = geoETRS.height;
+                            etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                            shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
+                            if (shifts) {
+                                E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn;
+                                finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
+                            }
+                        }
+                        break;
+                }
+
+                if (finalResult) {
+                    allResults.push(finalResult);
+                    const resultRowHTML = `
+                        <tr>
+                            <td>${finalResult.pointId}</td>
+                            <td>${finalResult.E_osgb.toFixed(3)}</td>
+                            <td>${finalResult.N_osgb.toFixed(3)}</td>
+                            <td>${finalResult.H_osgb.toFixed(3)}</td>
+                            <td>${finalResult.latitude.toFixed(8)}</td>
+                            <td>${finalResult.longitude.toFixed(8)}</td>
+                            <td>${finalResult.H_etrs.toFixed(3)}</td>
+                            <td>${finalResult.lsgE.toFixed(3)}</td>
+                            <td>${finalResult.lsgN.toFixed(3)}</td>
+                            <td>${finalResult.H_lsg.toFixed(3)}</td>
+                        </tr>`;
+                    resultTbody.innerHTML += resultRowHTML;
+                }
+            },
+            complete: () => {
+                spinner.style.display = 'none';
+                resultContainer.style.display = 'block';
+                if (allResults.length > 0) {
+                     downloadBtn.disabled = false;
+                     updateMapWithPoints(allResults);
+                }
+            }
+        });
+    }
+
     // --------------------------------------------------------------------
     // --- 3. EVENT LISTENERS AND INITIALIZATION ---
     // --------------------------------------------------------------------
     
-    uploadBtn.addEventListener('click', () => {
-    csvInput.value = ''; // Clear previous selection
-    csvInput.click(); // Trigger the hidden file input
-});
-
-csvInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        handleFile(file);
-    }
-});
-
-clearBtn.addEventListener('click', () => {
-    // Clear the table and reset state (existing logic)
-    resultTbody.innerHTML = '';
-    pointCounter = 1;
-    resultContainer.style.display = 'none';
-    downloadBtn.disabled = true;
-
-    // --- NEW LOGIC TO RESET THE MAP COMPLETELY ---
-
-    // 1. Remove the single marker (from manual conversions) if it exists
-    if (marker) {
-        marker.remove();
-        marker = null;
-    }
-
-    // 2. Remove all CSV markers (from bulk conversions) if they exist
-    if (markers.length > 0) {
-        markers.forEach(m => m.remove());
-        markers = []; // Reset the array
-    }
-
-    // 3. Reset the map's view to the original London center and zoom
-    map.setView([51.5074, -0.1278], 9);
-});
-
     aboutBtn.addEventListener('click', () => {
         aboutSection.classList.toggle('hidden');
         aboutBtn.textContent = aboutSection.classList.contains('hidden') ? 'About This Tool' : 'Hide About Section';
     });
 
-    downloadBtn.addEventListener('click', downloadResults);
-
     modeSelector.addEventListener('change', (event) => {
         pointCounter = 1;
-        resultTbody.innerHTML = ''; // Clear previous results
+        resultTbody.innerHTML = '';
         const selectedMode = event.target.value;
         osgbForm.style.display = 'none'; etrsForm.style.display = 'none'; lsgForm.style.display = 'none';
         let activeForm = osgbForm;
@@ -480,6 +431,21 @@ clearBtn.addEventListener('click', () => {
         activeForm.appendChild(statusText);
         resultContainer.style.display = 'none';
     });
+    
+    uploadBtn.addEventListener('click', () => { csvInput.value = null; csvInput.click(); });
+    csvInput.addEventListener('change', (event) => { if (event.target.files[0]) handleFile(event.target.files[0]); });
+    clearBtn.addEventListener('click', () => {
+        resultTbody.innerHTML = '';
+        pointCounter = 1;
+        resultContainer.style.display = 'none';
+        downloadBtn.disabled = true;
+        if (marker) marker.remove();
+        markers.forEach(m => m.remove());
+        markers = [];
+        marker = null;
+        map.setView([51.5074, -0.1278], 14);
+    });
+    downloadBtn.addEventListener('click', downloadResults);
 
     statusText.textContent = "Attempting to load transformation data...";
     Papa.parse('ostn15.csv', {
@@ -512,4 +478,5 @@ clearBtn.addEventListener('click', () => {
             alert(`Failed to load or parse OSTN15 data. Check console (F12). Error: ${error.message}`);
         }
     });
+
 });

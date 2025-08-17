@@ -67,7 +67,7 @@
                         <p style="margin: 0;">This viewer is optimised for Leica GSI data and supports both GSI-8 and GSI-16 formats. Processing of GNSS and other forms of GSI and survey data are in development.</p><br>
 
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
-                            <strong>Version:</strong> 2025.1 • <strong>Created by:</strong> B Brewster
+                            <strong>Version:</strong> 1.0 • <strong>Created by:</strong> B Brewster
                             <br>
                             <strong>Contact:</strong> admin@surveytools.co.uk
                         </div>
@@ -119,6 +119,10 @@
                 <div class="stat-card">
                     <div class="stat-value" id="tpsStatSetups">0</div>
                     <div class="stat-label">Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tpsStatLocations">0</div>
+                    <div class="stat-label">Setup Locations</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="tpsStatObservations">0</div>
@@ -1881,6 +1885,7 @@
             statPoints: document.getElementById('statPoints'),
             tpsStatMethod: document.getElementById('tpsStatMethod'),
             tpsStatSetups: document.getElementById('tpsStatSetups'),
+            tpsStatLocations: document.getElementById('tpsStatLocations'), 
             tpsStatObservations: document.getElementById('tpsStatObservations'),
             tpsStatPoints: document.getElementById('tpsStatPoints'),
             
@@ -2365,15 +2370,15 @@ function hideTpsAdvancedSection() {
                 const setupCount = parser.tpsSetups.length;
                 const observationCount = parser.tpsSetups.reduce((acc, setup) => acc + setup.observations.length, 0);
                 const pointCount = new Set(parser.tpsSetups.flatMap(s => s.observations.map(o => o.words['11']?.value)).filter(p => p)).size;
+                const locationCount = new Set(parser.tpsSetups.map(s => s.stationName)).size;
                 
-                // --- CORRECTED LINES START HERE ---
-                // Populate Unified Stats using the correct TPS element IDs
-                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatMethod.textContent = 'TPS (Raw)';
                 elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatLocations.textContent = locationCount;
                 elements.tpsStatObservations.textContent = observationCount;
                 elements.tpsStatPoints.textContent = pointCount;
-                // --- CORRECTED LINES END HERE ---
                 
+                // (The rest of the raw view logic is the same...)
                 if (observationCount > 20 && elements.tpsShowAllBtn) {
                     elements.tpsShowAllBtn.style.display = 'inline-block';
                     elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
@@ -2382,7 +2387,6 @@ function hideTpsAdvancedSection() {
                 }
                 const rawObservations = parser.tpsSetups.flatMap(setup => setup.observations.map(obs => ({...obs, atStation: setup.stationName, instHt: setup.instrumentHeight })));
                 const dataToDisplay = tpsIsFullView ? rawObservations : rawObservations.slice(0, 20);
-
                 elements.tpsDataTable.innerHTML = '';
                 if (dataToDisplay.length === 0) {
                     const row = elements.tpsDataTable.insertRow();
@@ -2409,17 +2413,17 @@ function hideTpsAdvancedSection() {
             } else {
                 // --- AGGREGATED VIEW LOGIC ---
                 const finalObsCount = parser.finalTpsObservations.length;
-                const setupCount = new Set(parser.finalTpsObservations.map(o => o.atStation)).size;
+                const setupCount = parser.tpsSetups.length; // Total setups from WI 41
+                const locationCount = new Set(parser.tpsSetups.map(s => s.stationName)).size;
                 const pointCount = new Set(parser.finalTpsObservations.map(o => o.toPoint)).size;
                 
-                // --- CORRECTED LINES START HERE ---
-                // Populate Unified Stats using the correct TPS element IDs
-                elements.tpsStatMethod.textContent = 'TPS (Obs)';
+                elements.tpsStatMethod.textContent = 'TPS (Avg)';
                 elements.tpsStatSetups.textContent = setupCount;
+                elements.tpsStatLocations.textContent = locationCount;
                 elements.tpsStatObservations.textContent = finalObsCount;
                 elements.tpsStatPoints.textContent = pointCount;
-                // --- CORRECTED LINES END HERE ---
 
+                // (The rest of the aggregated view logic is the same...)
                 if (finalObsCount > 20 && elements.tpsShowAllBtn) {
                     elements.tpsShowAllBtn.style.display = 'inline-block';
                     elements.tpsShowAllBtn.textContent = tpsIsFullView ? 'Show Preview' : 'Show All';
@@ -2427,7 +2431,6 @@ function hideTpsAdvancedSection() {
                     elements.tpsShowAllBtn.style.display = 'none';
                 }
                 const dataToDisplay = tpsIsFullView ? parser.finalTpsObservations : parser.finalTpsObservations.slice(0, 20);
-
                 elements.tpsDataTable.innerHTML = '';
                 if (dataToDisplay.length === 0) {
                     const row = elements.tpsDataTable.insertRow();
@@ -2448,27 +2451,29 @@ function hideTpsAdvancedSection() {
                             qaFlag = ` <span class="qa-fail" title="QA Check Failed: Expand for details">!</span>`;
                         }
                         const summaryRow = document.createElement('tr');
+                        summaryRow.className = 'summary-row';
+                        summaryRow.dataset.targetId = l1_detailsId; 
                         summaryRow.innerHTML = `
                             <td><span class="expander" data-target-id="${l1_detailsId}">+</span>${escapeHtml(obs.atStation)}</td>
-                            <td><strong>${escapeHtml(obs.toPoint)}</strong>${qaFlag}</td>
-                            <td>Face I & II</td>
-                            <td class="numeric">${formatDecimalDegrees(obs.meanHz)}</td>
-                            <td class="numeric">${formatDecimalDegrees(obs.meanV)}</td>
-                            <td class="numeric">${obs.meanSd.toFixed(3)}</td>
-                            <td class="numeric">${obs.instHt.toFixed(3)}</td>
-                            <td class="numeric">${obs.targetHeight.toFixed(3)}</td>
-                        `;
+    <td><strong>${escapeHtml(obs.toPoint)}</strong>${qaFlag}</td>
+    <td>${obs.faceData.faceI && obs.faceData.faceII ? 'Face I & II' : (obs.faceData.faceI ? 'Face I' : 'Face II')}</td>
+    <td class="numeric">${formatDecimalDegrees(obs.meanHz)}</td>
+    <td class="numeric">${formatDecimalDegrees(obs.meanV)}</td>
+    <td class="numeric">${obs.meanSd.toFixed(3)}</td>
+    <td class="numeric">${obs.instHt.toFixed(3)}</td>
+    <td class="numeric">${obs.targetHeight.toFixed(3)}</td>
+`;
                         const detailsRow = document.createElement('tr');
                         detailsRow.className = 'details-row hidden';
                         detailsRow.id = l1_detailsId;
-                        let l1_html = `<td colspan="8"><div class="details-container"><table>`;
+                        let l1_html = `<td colspan="8"><div class="details-container"><table><tbody>`;
                         if (obs.faceData.faceI) {
                             const faceI = obs.faceData.faceI;
                             const l2_faceI_id = `l2-details-f1-${obsCounter}`;
                             const qaSpreadFail = faceI.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
                             l1_html += `
-                                <tr class="summary-row">
-                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceI_id}">+</span> ${escapeHtml(faceI.pointId)}${qaSpreadFail}</td>
+                                <tr class="summary-row" data-target-id="${l2_faceI_id}">
+    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceI_id}">+</span> ${escapeHtml(faceI.pointId)}${qaSpreadFail}</td>
                                     <td style="width: 15%;">${faceI.face} (${faceI.count} obs)</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanHz)}</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceI.meanV)}</td>
@@ -2501,8 +2506,8 @@ function hideTpsAdvancedSection() {
                             const l2_faceII_id = `l2-details-f2-${obsCounter}`;
                             const qaSpreadFail = faceII.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
                              l1_html += `
-                                <tr class="summary-row">
-                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFail}</td>
+                                <tr class="summary-row" data-target-id="${l2_faceII_id}">
+    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFail}</td>
                                     <td style="width: 15%;">${faceII.face} (${faceII.count} obs)</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanHz)}</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanV)}</td>
