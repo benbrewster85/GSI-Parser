@@ -863,6 +863,8 @@
                 return 'Mixed/Unknown'; // If patterns are inconsistent, we can't be sure
             }
 
+            
+
             identifyCalibrationData(runsForDetection) {
                 const result = { isCalibration: false, type: null, confidence: 0, issues: [], recordRange: null };
 
@@ -881,6 +883,9 @@
                         return result;
                     }
                 }
+            
+
+                
                 // --- END NEW METHOD ---
 
 
@@ -937,6 +942,58 @@
                 
                 return result;
             }
+
+            checkEarly2PegPattern(records) {
+                const result = { is2Peg: false, confidence: 0, issues: [], recordRange: null };
+                if (records.length < 4) return result;
+
+                const points = new Set();
+                records.forEach(r => {
+                    if (r.words['11']?.value) {
+                        points.add(r.words['11'].value);
+                    }
+                });
+
+                const uniquePoints = Array.from(points);
+
+                // A classic 2-peg test has exactly two unique points (e.g., PEG A, PEG B).
+                if (uniquePoints.length !== 2) {
+                    return result;
+                }
+
+                // It typically involves two setups.
+                const setupCount = new Set(records.map(r => r.setupNumber).filter(Boolean)).size;
+                
+                let confidenceScore = 0;
+                result.issues.push(`Found 2 unique points: ${uniquePoints.join(', ')}`);
+
+                if (setupCount >= 2) {
+                    confidenceScore += 50;
+                    result.issues.push(`Detected ${setupCount} instrument setups.`);
+                }
+                
+                // Check for a pattern like: BS to A, FS to B, then BS to B, FS to A
+                const hasExpectedReadings = records.filter(r => 
+                    (r.type === 'backsight' && r.words['11']?.value === uniquePoints[0]) ||
+                    (r.type === 'foresight' && r.words['11']?.value === uniquePoints[1])
+                ).length >= 2;
+
+                if (hasExpectedReadings) {
+                    confidenceScore += 30;
+                }
+
+                if (confidenceScore >= 80) {
+                    result.is2Peg = true;
+                    result.confidence = Math.min(100, confidenceScore);
+                    const firstLine = records[0].lineNumber;
+                    const lastLine = records[records.length - 1].lineNumber;
+                    result.recordRange = `Lines ${firstLine} to ${lastLine}`;
+                }
+                
+                return result;
+            }
+
+            
 
             checkRepeatedPointPattern(runsForDetection) {
                 const pointObservations = {};
@@ -1845,16 +1902,17 @@
             status: document.getElementById('status'),
             formatStatus: document.getElementById('formatStatus'),
             
-            
             // UI Sections
             statsSection: document.getElementById('statsSection'),
             tpsStatsSection: document.getElementById('tpsStatsSection'),
             actionsSection: document.getElementById('actionsSection'),
+            tpsActionsSection: document.getElementById('tpsActionsSection'),
             previewSection: document.getElementById('previewSection'),
             analysisSection: document.getElementById('analysisSection'),
             tpsPreviewSection: document.getElementById('tpsPreviewSection'),
             outputSection: document.getElementById('outputSection'),
             advancedSection: document.getElementById('advancedSection'),
+            tpsAdvancedSection: document.getElementById('tpsAdvancedSection'),
 
             // UI Components
             dataTable: document.getElementById('dataTable'),
@@ -1864,28 +1922,17 @@
             toggleViewBtn: document.getElementById('toggleViewBtn'),
             tpsViewToggleBtn: document.getElementById('tpsViewToggleBtn'),
             tpsShowAllBtn: document.getElementById('tpsShowAllBtn'),
-            tpsActionsSection: document.getElementById('tpsActionsSection'),
-            tpsStarnetBtn: document.getElementById('tpsStarnetBtn'),     
-            tpsAdvancedBtn: document.getElementById('tpsAdvancedBtn'),
-            tpsAdvancedSection: document.getElementById('tpsAdvancedSection'),
-            tpsAdvancedToggle: document.getElementById('tpsAdvancedToggle'),
-            applyTpsAdvanced: document.getElementById('applyTpsAdvanced'),
-            applyTpsText: document.getElementById('applyTpsText'),
-            applyTpsSpinner: document.getElementById('applyTpsSpinner'),
-            qaHzSpread: document.getElementById('qaHzSpread'),
-            qaVaSpread: document.getElementById('qaVaSpread'),
-            qaSdSpread: document.getElementById('qaSdSpread'),
-            qaFaceHz: document.getElementById('qaFaceHz'),
-            qaFaceVa: document.getElementById('qaFaceVa'), 
             
-            // Harmonized Stat Values
-            statMethod: document.getElementById('statMethod'),
-            statSetups: document.getElementById('statSetups'),
-            statObservations: document.getElementById('statObservations'),
-            statPoints: document.getElementById('statPoints'),
+            // Leveling Stat Values
+            levelStatMethod: document.getElementById('statMethod'),
+            levelStatSetups: document.getElementById('statSetups'),
+            levelStatObservations: document.getElementById('statObservations'),
+            levelStatPoints: document.getElementById('statPoints'),
+            
+            // TPS Stat Values
             tpsStatMethod: document.getElementById('tpsStatMethod'),
             tpsStatSetups: document.getElementById('tpsStatSetups'),
-            tpsStatLocations: document.getElementById('tpsStatLocations'), 
+            tpsStatLocations: document.getElementById('tpsStatLocations'),
             tpsStatObservations: document.getElementById('tpsStatObservations'),
             tpsStatPoints: document.getElementById('tpsStatPoints'),
             
@@ -1894,16 +1941,19 @@
             starnetBtn: document.getElementById('starnetBtn'),
             csvBtn: document.getElementById('csvBtn'),
             advancedBtn: document.getElementById('advancedBtn'),
+            tpsStarnetBtn: document.getElementById('tpsStarnetBtn'),
+            tpsAdvancedBtn: document.getElementById('tpsAdvancedBtn'),
             downloadBtn: document.getElementById('downloadBtn'),
             copyBtn: document.getElementById('copyBtn'),
             advancedToggle: document.getElementById('advancedToggle'),
+            tpsAdvancedToggle: document.getElementById('tpsAdvancedToggle'),
             applyAdvanced: document.getElementById('applyAdvanced'),
+            applyTpsAdvanced: document.getElementById('applyTpsAdvanced'),
             aboutBtn: document.getElementById('aboutBtn'),
             aboutSection: document.getElementById('aboutSection'),
             aboutToggle: document.getElementById('aboutToggle'),
-            
 
-            // Advanced Options Form
+            // Leveling Advanced Options Form
             aggregateCP: document.getElementById('aggregateCP'),
             changePointPrefix: document.getElementById('changePointPrefix'),
             includeTurnCount: document.getElementById('includeTurnCount'),
@@ -1914,7 +1964,16 @@
             numericMin: document.getElementById('numericMin'),
             numericMax: document.getElementById('numericMax'),
             applyText: document.getElementById('applyText'),
-            applySpinner: document.getElementById('applySpinner')
+            applySpinner: document.getElementById('applySpinner'),
+
+            // TPS Advanced Options Form
+            applyTpsText: document.getElementById('applyTpsText'),
+            applyTpsSpinner: document.getElementById('applyTpsSpinner'),
+            qaHzSpread: document.getElementById('qaHzSpread'),
+            qaVaSpread: document.getElementById('qaVaSpread'),
+            qaSdSpread: document.getElementById('qaSdSpread'),
+            qaFaceHz: document.getElementById('qaFaceHz'),
+            qaFaceVa: document.getElementById('qaFaceVa')
         };
 
 
@@ -2293,10 +2352,10 @@ function hideTpsAdvancedSection() {
        function updateLevelingUI() {
             // --- Populate Harmonized Stats ---
             const observationCount = parser.data.filter(r => ['backsight', 'foresight', 'intermediate'].includes(r.type)).length;
-            elements.statMethod.textContent = `LEVEL (${parser.stats.method})`;
-            elements.statSetups.textContent = parser.stats.setupCount;
-            elements.statObservations.textContent = observationCount;
-            elements.statPoints.textContent = parser.stats.pointCount;
+            elements.levelStatMethod.textContent = `LEVEL (${parser.stats.method})`;
+            elements.levelStatSetups.textContent = parser.stats.setupCount;
+            elements.levelStatObservations.textContent = observationCount;
+            elements.levelStatPoints.textContent = parser.stats.pointCount;
 
             // Update toggle button visibility and text (logic is the same)
             if (parser.data.length > 20) {
