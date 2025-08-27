@@ -1,6 +1,37 @@
 'use strict';
 
-function initializeTheme() {
+/**
+ * Toggles the theme between light and dark and saves the choice.
+ */
+function toggleTheme() {
+    const currentTheme = document.body.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', newTheme);
+    // Save the user's choice in their browser
+    localStorage.setItem('surveyToolsTheme', newTheme);
+}
+
+/**
+ * Loads the saved theme from localStorage or defaults to system preference.
+ */
+function loadSavedTheme() {
+    const savedTheme = localStorage.getItem('surveyToolsTheme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme) {
+        document.body.setAttribute('data-theme', savedTheme);
+    } else if (prefersDark) {
+        document.body.setAttribute('data-theme', 'dark');
+    } else {
+        document.body.setAttribute('data-theme', 'light');
+    }
+}
+
+/**
+ * Main initialization function for all global scripts.
+ */
+function initGlobal() {
+    // --- Theme Handling ---
     const themeBtn = document.getElementById('themeBtn');
     if (themeBtn) {
         themeBtn.addEventListener('click', toggleTheme);
@@ -8,36 +39,9 @@ function initializeTheme() {
     loadSavedTheme();
 }
 
-function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme');
-    const newTheme = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    try {
-        localStorage.setItem('theme', newTheme);
-    } catch (e) {
-        console.warn('Could not save theme preference');
-    }
-}
-
-function loadSavedTheme() {
-    try {
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        } else {
-            // Default to dark if no theme is saved
-            document.documentElement.setAttribute('data-theme', 'dark');
-        }
-    } catch (e) {
-        console.warn('Could not load theme preference');
-         document.documentElement.setAttribute('data-theme', 'dark');
-    }
-}
-
-// Run the theme initializer when the page loads
+// Initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeTheme);
+    document.addEventListener('DOMContentLoaded', initGlobal);
 } else {
-    initializeTheme();
+    initGlobal();
 }
-

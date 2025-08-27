@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Rail Analysis Dashboard - Survey Tools</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Add specific overrides and layout styles not present in the global style.css */
+        .local-header { margin-bottom: 20px; }
+        .header-buttons { display: flex; gap: 10px; }
+
+        .stats { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+        .stat-card { background-color: var(--bg); padding: 15px 20px; border-radius: 8px; text-align: center; border: 1px solid var(--border); flex-grow: 1; }
+        .stat-value { font-size: 1.75em; font-weight: 600; color: var(--accent); }
+        .stat-label { font-size: 0.9em; color: var(--text-dim); margin-top: 5px; }
+        
+        .actions { display: flex; gap: 10px; }
+
+        .card { display: flex; flex-direction: column; overflow: hidden; }
+        .card-content { flex: 1; min-height: 0; position: relative; }
+        .card-content svg { display: block; }
+        
+        #table-card { height: 45vh; margin-bottom: 20px; }
+        .data-table-container { margin-top: 15px; height: 100%; overflow: auto; }
+        tr.highlighted { background-color: var(--highlight-bg); }
+
+        .data-table-container th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            /* The background from your style.css will keep it opaque */
+            background: var(--bg); 
+        }
+
+        .data-table-container table {
+            font-size: 11px; /* Slightly smaller font for data density */
+        }
+        .data-table-container th,
+        .data-table-container td {
+            padding: 6px 4px; /* Reduce horizontal padding */
+        }
+
+        .data-table-container tr:hover {
+            background-color: var(--highlight-bg);
+        }
+
+        .visualisations-grid { align-self: center; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 40vh; }
+
+        .rail-path { fill: none; stroke-width: 2.5px; }
+        .brush .selection { fill: var(--accent); fill-opacity: 0.3; }
+        
+        .settings-row { display: flex; align-items: center; gap: 15px; }
+        .settings-row label { font-weight: bold; }
+        select.input { padding: 8px; border-radius: 5px; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    </style>
+</head>
+<body data-theme="dark">
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+    
+    <div class="container">
+        <div class="local-header">
+            <div class="local-header-container">
+                <h2>Advanced Rail Analysis Dashboard</h2>
+                <div class="header-buttons">
+                    <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="aboutSection">
+            <div class="section-title">
+                ℹ️ About The Rail Dashboard
+                <button class="btn" id="aboutToggle">Hide</button>
+            </div>
+            <div class="advanced-grid">
+                 <div>
+                    <h4>Features</h4>
+                    <ul>
+                        <li>Processes CSV files of surveyed rail points (E, N, H).</li>
+                        <li>Calculates centreline, radius, cant, and 2m twist.</li>
+                        <li>Allows reprocessing of chainage direction via Advanced Settings.</li>
+                        <li>Fully interactive charts and data table.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>How to Use</h4>
+                    <ol>
+                        <li>Upload your CSV file (<strong>With headers</strong> ID, E, N, H).</li>
+                        <li>Analyse the data in the table and charts.</li>
+                        <li>Use Advanced Settings to re-define the start of the track if needed.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <p style="font-size: 2em; margin:0;">📁</p>
+                Drop Rail CSV File Here or Click to Select
+                <input type="file" id="fileInput" class="file-input" accept=".csv,.txt">
+            </div>
+            <div id="status" class="status hidden"></div>
+        </div>
+        
+        <div class="section hidden" id="statsSection">
+            <div class="stats">
+                <div class="stat-card"><div class="stat-value" id="statDistance">0m</div><div class="stat-label">Total Track Distance</div></div>
+                <div class="stat-card"><div class="stat-value" id="statPairs">0</div><div class="stat-label">Rail Pairs</div></div>
+                <div class="stat-card"><div class="stat-value" id="statMaxCant">0mm</div><div class="stat-label">Max Cant</div></div>
+                <div class="stat-card"><div class="stat-value" id="statMinCant">0mm</div><div class="stat-label">Min Cant</div></div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="actionsSection">
+            <div class="actions">
+                <button class="btn" id="advancedBtn">⚙️ Advanced Settings</button>
+            </div>
+        </div>
+        
+        <div class="section hidden" id="advancedSettingsSection">
+            <div class="section-title">
+                ⚙️ Advanced Settings
+                <button class="btn" id="advancedSettingsToggle">Hide</button>
+            </div>
+            <div class="settings-row">
+                <label for="startDirectionSelect">Define Low Chainage End:</label>
+                <select id="startDirectionSelect" class="input">
+                    <option value="automatic" selected>Automatic</option>
+                    <option value="north">Most Northerly</option>
+                    <option value="south">Most Southerly</option>
+                    <option value="east">Most Easterly</option>
+                    <option value="west">Most Westerly</option>
+                </select>
+                <button class="btn" id="reprocessBtn">Reprocess</button>
+            </div>
+        </div>
+
+        <div class="section hidden" id="resultsSection">
+            <div class="card" id="table-card">
+                <div class="table-header">Data Table</div>
+                <div class="card-content data-table-container" id="data-table-container"></div>
+            </div>
+            <div class="visualisations-grid">
+                <div class="card" id="profile-view-card">
+                    <h4>Profile & Cant</h4>
+                    <div class="card-content" id="profile-view-chart"></div>
+                </div>
+                <div class="card" id="plan-view-card">
+                    <h4>Plan View</h4>
+                    <div class="card-content" id="plan-view-chart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="footer">Created by B Brewster • © 2025</div>
+    </div>
+    
+    <script>
+    'use strict';
+
+    class RailSurveyProcessor {
+        constructor() {
+            this.config = { nominalGauge: 1.435, gaugeTolerance: 0.050, twistBaseline: 2.0 };
+            this.pairs = []; this.processedData = []; this.stats = {};
+        }
+        findPairs(csvText) {
+            const points = this._parseCSV(csvText);
+            if (!points || points.length === 0) throw new Error("No valid data points found.");
+            this.pairs = this._findRailPairs(points);
+            if (this.pairs.length < 3) throw new Error("Not enough rail pairs for analysis (min 3 required).");
+            return this.pairs;
+        }
+        orderAndAnalyze(startDirection = 'automatic') {
+            if (this.pairs.length < 2) return [];
+            const ordered = this._orderPairs(startDirection);
+            this._calculateGeometry(ordered);
+            this._calculateStats();
+            return this.processedData;
+        }
+        _orderPairs(startDirection) {
+            let rem = [...this.pairs]; let startPair;
+            if (startDirection === 'automatic') { startPair = rem.shift(); } 
+            else {
+                let bestIndex = -1; let bestVal = (startDirection === 'south' || startDirection === 'west') ? Infinity : -Infinity;
+                rem.forEach((pair, index) => { const mid = pair.mid; if (startDirection === 'north' && mid.n > bestVal) { bestVal = mid.n; bestIndex = index; } if (startDirection === 'south' && mid.n < bestVal) { bestVal = mid.n; bestIndex = index; } if (startDirection === 'east' && mid.e > bestVal) { bestVal = mid.e; bestIndex = index; } if (startDirection === 'west' && mid.e < bestVal) { bestVal = mid.e; bestIndex = index; } });
+                startPair = (bestIndex === -1) ? rem.shift() : rem.splice(bestIndex, 1)[0];
+            }
+            const ordered = [startPair]; let curr = startPair;
+            while (rem.length > 0) {
+                let nearestIdx = -1, minDist = Infinity;
+                for (let i = 0; i < rem.length; i++) { const dist = Math.hypot(curr.mid.e - rem[i].mid.e, curr.mid.n - rem[i].mid.n); if (dist < minDist) { minDist = dist; nearestIdx = i; } }
+                curr = rem.splice(nearestIdx, 1)[0]; ordered.push(curr);
+            }
+            return ordered;
+        }
+        _calculateGeometry(orderedPairs) {
+            let ch = 0;
+            this.processedData = orderedPairs.map((p, i) => {
+                if (i > 0) ch += Math.hypot(p.mid.e - orderedPairs[i - 1].mid.e, p.mid.n - orderedPairs[i - 1].mid.n);
+                const dirE = (i < orderedPairs.length - 1) ? orderedPairs[i + 1].mid.e - p.mid.e : p.mid.e - orderedPairs[i - 1].mid.e;
+                const dirN = (i < orderedPairs.length - 1) ? orderedPairs[i + 1].mid.n - p.mid.n : p.mid.n - orderedPairs[i - 1].mid.n;
+                const cross = dirE * (p.p1.n - p.mid.n) - dirN * (p.p1.e - p.mid.e);
+                const leftRail = cross > 0 ? p.p1 : p.p2;
+                const rightRail = cross > 0 ? p.p2 : p.p1;
+                return { chainage: ch, leftRail, rightRail, centreline: { e: p.mid.e, n: p.mid.n, h: (leftRail.h + rightRail.h) / 2 }, cant: (rightRail.h - leftRail.h) * 1000, gauge: Math.hypot(leftRail.e - rightRail.e, leftRail.n - rightRail.n) };
+            });
+            this.processedData.forEach((d, i, arr) => {
+                d.radius = this._getInstantaneousRadius(i, arr);
+                d.twist = this._getTwist(i, arr);
+            });
+        }
+        _getInstantaneousRadius(index, data) {
+            if (index < 1 || index >= data.length - 1) return Infinity;
+            const p1 = data[index - 1].centreline, p2 = data[index].centreline, p3 = data[index + 1].centreline;
+            const a = Math.hypot(p2.e - p3.e, p2.n - p3.n), b = Math.hypot(p1.e - p3.e, p1.n - p3.n), c = Math.hypot(p1.e - p2.e, p1.n - p2.n);
+            const area = 0.25 * Math.sqrt((a + b + c) * (-a + b + c) * (a - b + c) * (a + b - c));
+            return area > 0 ? (a * b * c) / (4 * area) : Infinity;
+        }
+        _getTwist(index, data) {
+            const base = this.config.twistBaseline; let endIndex = -1;
+            for (let j = index + 1; j < data.length; j++) { if (data[j].chainage - data[index].chainage >= base) { endIndex = j; break; } }
+            if (endIndex === -1) return 0;
+            return (data[endIndex].cant - data[index].cant) / (data[endIndex].chainage - data[index].chainage);
+        }
+        _calculateStats() {
+            if (this.processedData.length === 0) { this.stats = {}; return; }
+            const cants = this.processedData.map(d => d.cant);
+            this.stats = { totalDistance: this.processedData[this.processedData.length - 1].chainage, pairCount: this.processedData.length, maxCant: Math.max(...cants), minCant: Math.min(...cants) };
+        }
+        _parseCSV(text) { return text.split('\n').filter(Boolean).map((line,id)=>{const p=line.split(',').map(part => parseFloat(part.trim()));if(p.length<3||p.some(isNaN))return null;return{id,e:p[1],n:p[2],h:p[3]}}).filter(Boolean);}
+        _findRailPairs(points) { const pairs=[],paired=new Set();for(let i=0;i<points.length;i++){if(paired.has(i))continue;let bestMatchIndex=-1,minDiff=Infinity;for(let j=i+1;j<points.length;j++){if(paired.has(j))continue;const dist=Math.hypot(points[i].e-points[j].e,points[i].n-points[j].n);if(dist>=this.config.nominalGauge-this.config.gaugeTolerance&&dist<=this.config.nominalGauge+this.config.gaugeTolerance){const diff=Math.abs(dist-this.config.nominalGauge);if(diff<minDiff){minDiff=diff;bestMatchIndex=j;}}}if(bestMatchIndex!==-1){const bestMatch=points[bestMatchIndex];pairs.push({p1:points[i],p2:bestMatch,mid:{e:(points[i].e+bestMatch.e)/2,n:(points[i].n+bestMatch.n)/2}});paired.add(i);paired.add(bestMatchIndex);}}return pairs;}
+    }
+
+    const railProcessor = new RailSurveyProcessor();
+    const d3Charts = {};
+    const elements = {};
+    let activeHighlightIndex = null;
+    
+    function highlightPoint(index) {
+        if (index === null || !railProcessor.processedData[index] || index === activeHighlightIndex) return;
+        unhighlightPoint(); activeHighlightIndex = index;
+        const d = railProcessor.processedData[index];
+        d3Charts.planHighlight.attr('cx', d3Charts.planX(d.leftRail.e)).attr('cy', d3Charts.planY(d.leftRail.n)).style('opacity', 1);
+        d3Charts.planHighlight2.attr('cx', d3Charts.planX(d.rightRail.e)).attr('cy', d3Charts.planY(d.rightRail.n)).style('opacity', 1);
+        d3Charts.profileCursor.attr('x1', d3Charts.profileX(d.chainage)).attr('x2', d3Charts.profileX(d.chainage)).style('opacity', 1);
+        const row = elements.tableContainer.querySelector(`tr[data-index='${index}']`);
+        if (row) { row.classList.add('highlighted'); row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    }
+    function unhighlightPoint() {
+        if (activeHighlightIndex === null) return;
+        const row = elements.tableContainer.querySelector(`tr[data-index='${activeHighlightIndex}']`);
+        if(row) row.classList.remove('highlighted');
+        d3Charts.planHighlight.style('opacity', 0); d3Charts.planHighlight2.style('opacity', 0);
+        d3Charts.profileCursor.style('opacity', 0);
+        activeHighlightIndex = null;
+    }
+
+    function updateStatsUI() { const stats = railProcessor.stats; elements.statDistance.textContent = `${stats.totalDistance.toFixed(2)}m`; elements.statPairs.textContent = stats.pairCount; elements.statMaxCant.textContent = `${stats.maxCant.toFixed(1)}mm`; elements.statMinCant.textContent = `${stats.minCant.toFixed(1)}mm`; }
+    function whenVisible(element, callback) { if (element.clientWidth > 0 && element.clientHeight > 0) { callback(); } else { requestAnimationFrame(() => whenVisible(element, callback)); } }
+    function updateDashboardUI(data) {
+        updateStatsUI();
+        whenVisible(elements.resultsSection, () => {
+            createPlanChart(data);
+            createProfileChart(data);
+            populateDataTable(data);
+        });
+    }
+
+    function createPlanChart(data) {
+        const container=elements.planChart;container.innerHTML='';const margin={top:10,right:10,bottom:10,left:10},width=container.clientWidth-margin.left-margin.right,height=container.clientHeight-margin.top-margin.bottom,svg=d3.select(container).append("svg").attr("width",width+margin.left+margin.right).attr("height",height+margin.top+margin.bottom).append("g").attr("transform",`translate(${margin.left},${margin.top})`),allPoints=data.flatMap(d=>[d.leftRail,d.rightRail]),xExtent=d3.extent(allPoints,d=>d.e),yExtent=d3.extent(allPoints,d=>d.n),xRange=xExtent[1]-xExtent[0],yRange=yExtent[1]-yExtent[0],x=d3.scaleLinear().range([0,width]),y=d3.scaleLinear().range([height,0]);if(xRange/width>yRange/height){x.domain(xExtent);const yMid=(yExtent[0]+yExtent[1])/2,newYRadius=(xRange*height)/(2*width);y.domain([yMid-newYRadius,yMid+newYRadius]);}else{y.domain(yExtent);const xMid=(xExtent[0]+xExtent[1])/2,newXRadius=(yRange*width)/(2*height);x.domain([xMid-newXRadius,xMid+newXRadius]);} d3Charts.planX=x;d3Charts.planY=y;const lineGen=d3.line().x(d=>x(d.e)).y(d=>y(d.n));svg.append("path").datum(data.map(d=>d.leftRail)).attr("class","rail-path").attr("stroke","#1f77b4").attr("d",lineGen);svg.append("path").datum(data.map(d=>d.rightRail)).attr("class","rail-path").attr("stroke","#ff7f0e").attr("d",lineGen);d3Charts.planHighlight=svg.append('circle').attr('r',8).attr('fill','none').attr('stroke','yellow').attr('stroke-width',2).style('opacity',0).style('pointer-events','none');d3Charts.planHighlight2=svg.append('circle').attr('r',8).attr('fill','none').attr('stroke','yellow').attr('stroke-width',2).style('opacity',0).style('pointer-events','none');
+    }
+    function createProfileChart(data) {
+        const container=elements.profileChart;container.innerHTML='';const margin={top:10,right:40,bottom:30,left:40},width=container.clientWidth-margin.left-margin.right,height=container.clientHeight-margin.top-margin.bottom,svg=d3.select(container).append("svg").attr("width",width+margin.left+margin.right).attr("height",height+margin.top+margin.bottom).append("g").attr("transform",`translate(${margin.left},${margin.top})`),x=d3.scaleLinear().domain(d3.extent(data,d=>d.chainage)).range([0,width]);d3Charts.profileX=x;const yHeight=d3.scaleLinear().domain(d3.extent(data.flatMap(d=>[d.leftRail.h,d.rightRail.h]))).range([height,0]).nice(),yCant=d3.scaleLinear().domain(d3.extent(data,d=>d.cant)).range([height,0]).nice();svg.append("g").attr("transform",`translate(0,${height})`).call(d3.axisBottom(x));svg.append("g").call(d3.axisLeft(yHeight).ticks(5)).append("text").attr("fill","var(--text)").attr("transform","rotate(-90)").attr("y",-30).attr("x",-height/2).style("text-anchor","middle").text("Height (m)");svg.append("g").attr("transform",`translate(${width},0)`).call(d3.axisRight(yCant).ticks(5)).append("text").attr("fill","var(--accent)").attr("transform","rotate(-90)").attr("y",30).attr("x",-height/2).style("text-anchor","middle").text("Cant (mm)");svg.append("path").datum(data).attr("fill","none").attr("stroke","#1f77b4").attr("stroke-width",1.5).attr("d",d3.line().x(d=>x(d.chainage)).y(d=>yHeight(d.leftRail.h)));svg.append("path").datum(data).attr("fill","none").attr("stroke","#ff7f0e").attr("stroke-width",1.5).attr("d",d3.line().x(d=>x(d.chainage)).y(d=>yHeight(d.rightRail.h)));svg.append("path").datum(data).attr("fill","var(--accent)").attr("fill-opacity",0.3).attr("stroke","none").attr("d",d3.area().x(d=>x(d.chainage)).y0(yCant(0)).y1(d=>yCant(d.cant)));d3Charts.profileCursor=svg.append('line').attr('y1',0).attr('y2',height).attr('stroke','yellow').style('opacity',0).style('pointer-events','none');
+    }
+    function populateDataTable(data) {
+        const table = document.createElement('table');
+        table.innerHTML = `<thead><tr><th>Ch.</th><th>LHR E</th><th>LHR N</th><th>LHR H</th><th>RHR E</th><th>RHR N</th><th>RHR H</th><th>Cant (mm)</th><th>Gauge (m)</th><th>Radius (m)</th><th>Twist (mm/m)</th></tr></thead>`;
+        const tbody = document.createElement('tbody');
+        data.forEach((d, i) => {
+            const row = tbody.insertRow();
+            row.dataset.index = i;
+            row.innerHTML = `<td>${d.chainage.toFixed(3)}</td><td>${d.leftRail.e.toFixed(3)}</td><td>${d.leftRail.n.toFixed(3)}</td><td>${d.leftRail.h.toFixed(3)}</td><td>${d.rightRail.e.toFixed(3)}</td><td>${d.rightRail.n.toFixed(3)}</td><td>${d.rightRail.h.toFixed(3)}</td><td>${d.cant.toFixed(1)}</td><td>${d.gauge.toFixed(3)}</td><td>${isFinite(d.radius)?d.radius.toFixed(1):'—'}</td><td>${d.twist.toFixed(1)}</td>`;
+            row.addEventListener('mouseenter',()=>highlightPoint(i));row.addEventListener('mouseleave',unhighlightPoint);
+        });
+        table.appendChild(tbody);
+        elements.tableContainer.innerHTML = '';
+        elements.tableContainer.appendChild(table);
+    }
+
+    function showStatus(message, type) { elements.status.innerHTML = message; elements.status.className = 'status ' + type; elements.status.classList.remove('hidden'); }
+    function handleFile(file) {
+        showStatus('Processing...', 'info');
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                railProcessor.findPairs(e.target.result); 
+                const processedData = railProcessor.orderAndAnalyze('automatic');
+                showStatus('✓ Dashboard generated successfully.', 'success');
+                elements.uploadSection.classList.add('hidden');
+                elements.statsSection.classList.remove('hidden');
+                elements.actionsSection.classList.remove('hidden');
+                elements.resultsSection.classList.remove('hidden');
+                updateDashboardUI(processedData);
+            } catch (error) { showStatus(`✗ ${error.message}`, 'error'); }
+        };
+        reader.onerror = () => showStatus('✗ Error reading file.', 'error');
+        reader.readAsText(file);
+    }
+    function reprocessData() {
+        if (railProcessor.pairs.length === 0) { showStatus('✗ No data to reprocess.', 'error'); return; }
+        showStatus('Reprocessing...', 'info');
+        setTimeout(() => {
+            const direction = elements.startDirectionSelect.value;
+            const reorderedData = railProcessor.orderAndAnalyze(direction);
+            updateDashboardUI(reorderedData);
+            showStatus('✓ Data reprocessed successfully.', 'success');
+        }, 50);
+    }
+    
+    function setupEventListeners() {
+        elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
+        elements.uploadArea.addEventListener('dragover', (e) => e.preventDefault());
+        elements.uploadArea.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+        elements.fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+        elements.aboutBtn.addEventListener('click', () => { elements.aboutSection.classList.toggle('hidden'); elements.advancedSettingsSection.classList.add('hidden'); });
+        elements.aboutToggle.addEventListener('click', () => elements.aboutSection.classList.add('hidden'));
+        elements.advancedBtn.addEventListener('click', () => { elements.advancedSettingsSection.classList.toggle('hidden'); elements.aboutSection.classList.add('hidden');});
+        elements.advancedSettingsToggle.addEventListener('click', () => elements.advancedSettingsSection.classList.add('hidden'));
+        elements.reprocessBtn.addEventListener('click', reprocessData);
+    }
+
+    function initializeApp() {
+        Object.assign(elements, {
+            uploadArea: document.getElementById('uploadArea'), fileInput: document.getElementById('fileInput'), status: document.getElementById('status'),
+            uploadSection: document.getElementById('uploadSection'), resultsSection: document.getElementById('resultsSection'),
+            planChart: document.getElementById('plan-view-chart'), profileChart: document.getElementById('profile-view-chart'),
+            tableContainer: document.getElementById('data-table-container'), aboutBtn: document.getElementById('aboutBtn'),
+            aboutSection: document.getElementById('aboutSection'), aboutToggle: document.getElementById('aboutToggle'),
+            themeBtn: document.getElementById('themeBtn'), advancedBtn: document.getElementById('advancedBtn'),
+            advancedSettingsSection: document.getElementById('advancedSettingsSection'),
+            advancedSettingsToggle: document.getElementById('advancedSettingsToggle'), startDirectionSelect: document.getElementById('startDirectionSelect'),
+            reprocessBtn: document.getElementById('reprocessBtn'), statsSection: document.getElementById('statsSection'),
+            actionsSection: document.getElementById('actionsSection'), statDistance: document.getElementById('statDistance'),
+            statPairs: document.getElementById('statPairs'), statMaxCant: document.getElementById('statMaxCant'),
+            statMinCant: document.getElementById('statMinCant')
+        });
+        // The theme button is handled by main.js, so we don't add its listener here.
+        setupEventListeners();
+    }
+
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initializeApp); } else { initializeApp(); }
+</script>
+<script src="/js/main.js"></script>
+</body>
+</html>
