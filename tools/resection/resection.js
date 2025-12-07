@@ -101,12 +101,14 @@ const app = {
     colors: { bg: '#000', grid: '#333', text: '#fff', accent: '#0f0', danger: 'red' },
 
     // State
-    width: 0, height: 0, cx: 0, cy: 0, scale: 5,
+    width: 0, height: 0, cx: 0, cy: 0, 
+    scale: 4, // Reduced from 5 to ensure points fit on smaller screens
     stn: { x: 0, y: 0 },
     targets: [
-        { x: -50, y: 50, id: 1 },
-        { x: 50, y: 50, id: 2 },
-        { x: 0, y: -60, id: 3 }
+        // Tighter geometry to ensure visibility on load
+        { x: -40, y: 30, id: 1 },
+        { x: 40, y: 30, id: 2 },
+        { x: 0, y: -40, id: 3 } // Moved from -60 to -40
     ],
     nextId: 4,
     
@@ -261,9 +263,14 @@ const app = {
     },
 
     reset() {
-        this.targets = [];
+        // Reset to tighter default coordinates
+        this.targets = [
+            { x: -40, y: 30, id: 1 },
+            { x: 40, y: 30, id: 2 },
+            { x: 0, y: -40, id: 3 }
+        ];
         this.stn = { x:0, y:0 };
-        this.nextId = 1; // FIX: Reset the ID counter back to 1
+        this.nextId = 4; // Set next ID correctly
         this.draw();
     },
 
