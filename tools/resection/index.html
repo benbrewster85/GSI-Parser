@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - Resection Analysis</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        /* Tool-Specific Styles */
+        .resection-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            /* Adjust height to fill screen minus header/nav */
+            height: calc(100vh - 180px); 
+            min-height: 500px;
+        }
+
+        .sidebar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .canvas-wrapper {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+        .slider-group { margin-bottom: 20px; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: var(--text-dim); }
+        input[type=range] { width: 100%; accent-color: var(--accent); }
+
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-val { font-family: 'SF Mono', monospace; color: var(--accent); font-weight: bold; }
+        
+        /* Action buttons in sidebar */
+        .action-row { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+
+        @media (max-width: 768px) {
+            .resection-grid { grid-template-columns: 1fr; height: auto; display: flex; flex-direction: column; }
+            .canvas-wrapper { height: 400px; order: -1; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+
+    <div class="container">
+        
+        <div class="local-header" style="margin-bottom: 20px;">
+            <div class="local-header-container">
+                <h2>Resection Geometry Lab</h2>
+                <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+            </div>
+        </div>
+
+        <div id="aboutSection" class="section hidden">
+            <div class="advanced-content">
+                <p>This tool visualises the <strong>Geometric Quality</strong> of a survey setup using Least Squares Estimation (LSE). It calculates the theoretical "Error Ellipse" for a station position based on the relative geometry of the target points and the precision of the instrument.</p>
+                
+                <div class="advanced-grid" style="margin-top: 20px;">
+                    <div class="advanced-group">
+                        <h4>How to Use</h4>
+                        <ul>
+                            <li><strong>Drag Points:</strong> Move the target points (Circles) or Station (Triangle) to simulate different site conditions.</li>
+                            <li><strong>Add/Remove:</strong> Use the buttons to add more observations. Right-click a point to delete it.</li>
+                            <li><strong>Instrument Specs:</strong> Adjust the sliders to see how using a more precise Total Station affects the result.</li>
+                            <li><strong>Confidence:</strong> Toggle between 1σ (Raw Math) and 95% (Survey Standard) confidence levels.</li>
+                        </ul>
+                    </div>
+                    <div class="advanced-group">
+                        <h4>Interpreting the Data</h4>
+                        <p>The red ellipse represents the area where the true position is likely to be.</p>
+                        <ul>
+                            <li><strong>Standard Error (1σ):</strong> Represents approx 39% confidence in 2D.</li>
+                            <li><strong>Survey Standard (95%):</strong> Represents the 1σ ellipse multiplied by <strong>2.447</strong>.</li>
+                            <li><strong>Scalar (DRMS):</strong> Distance Root Mean Square. A single number representing the "radius" of error (~63% confidence at 1σ).</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <p><strong>Note:</strong> This tool is intended for educational purposes only.</p>
+
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+                    <strong>Version:</strong> 1.0 (Beta) • <strong>Method:</strong> Parametric Least Squares Adjustment
+                </div>
+            </div>
+        </div>
+
+        <div class="resection-grid">
+            <div class="sidebar">
+                
+                <div class="action-row">
+                    <button class="btn primary" onclick="app.addPoint()" style="flex:1;">+ Add Point</button>
+                    <button class="btn" onclick="app.reset()" style="flex:1;">Reset</button>
+                </div>
+
+                <div class="section-title" style="font-size: 14px;">SETTINGS</div>
+                
+                <div class="slider-group">
+                    <div class="slider-label"><span>Confidence Level</span></div>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn primary small" id="btn-conf-1" onclick="app.setConfidence(1)" style="flex:1; font-size:11px; padding: 6px;">1σ (39%)</button>
+                        <button class="btn small" id="btn-conf-95" onclick="app.setConfidence(2.447)" style="flex:1; font-size:11px; padding: 6px; background:var(--surface); border:1px solid var(--border);">95%</button>
+                    </div>
+                </div>
+
+                <label class="checkbox-label" style="margin-bottom: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <input type="checkbox" id="chk-dist" checked> Enable EDM (Distance)
+                </label>
+
+                <div class="slider-group">
+                    <div class="slider-label"><span>Angular Accuracy</span> <span id="lbl-ang">5"</span></div>
+                    <input type="range" id="inp-ang" min="0.5" max="20" value="5" step="0.5">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label"><span>EDM Base Accuracy</span> <span id="lbl-dist">2mm</span></div>
+                    <input type="range" id="inp-dist" min="0" max="10" value="2" step="0.5">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label"><span>EDM PPM</span> <span id="lbl-ppm">2ppm</span></div>
+                    <input type="range" id="inp-ppm" min="0" max="10" value="2" step="0.5">
+                </div>
+
+                <div class="section-title" style="font-size: 14px; margin-top: 20px;">RESULTS</div>
+                <div class="advanced-content" style="padding: 15px; background: var(--bg);">
+                    <div class="stat-row"><span>Semi-Major</span> <span class="stat-val" id="res-maj">--</span></div>
+                    <div class="stat-row"><span>Semi-Minor</span> <span class="stat-val" id="res-min">--</span></div>
+                    <div class="stat-row"><span>Orientation</span> <span class="stat-val" id="res-rot">--</span></div>
+                    <div class="stat-row"><span>Scalar (DRMS)</span> <span class="stat-val" id="res-scalar">--</span></div>
+                </div>
+
+                <div class="help-text" style="margin-top: 20px;">
+                    <p>• <strong>Right-Click</strong> points to delete.</p>
+                    <p>• Ellipse magnified <strong>5000x</strong>.</p>
+                </div>
+            </div>
+
+            <div class="canvas-wrapper" id="canvas-container">
+                <canvas id="mainCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/main.js"></script>
+    <script src="resection.js"></script>
+    <script>
+        // Simple toggle for the About section
+        document.getElementById('aboutBtn').addEventListener('click', function() {
+            const section = document.getElementById('aboutSection');
+            section.classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>
