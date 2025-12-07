@@ -48,40 +48,199 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 2. FUNCTION DEFINITIONS ---
     // --------------------------------------------------------------------
 
+    // --- UPDATED INIT MAP FUNCTION ---
     function initMap() {
         if (map) return;
         map = L.map('map').setView([51.5074, -0.1278], 9);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(map);
+
+        // 2. Add Subtle Scale Bar (Bottom Left)
+        L.control.scale({
+            position: 'bottomleft',
+            metric: true,
+            imperial: false,
+            maxWidth: 150
+        }).addTo(map);
+
+        // 3. Dynamic Text Sizing Logic
+        const updateLabelSize = () => {
+            const zoom = map.getZoom();
+            // Formula: Zoom 10 = 10px, Zoom 18 = 18px. 
+            // We clamp it so it doesn't get too tiny (<10px) or absurdly large (>24px)
+            const newSize = Math.max(10, Math.min(24, zoom)) + 'px';
+            document.documentElement.style.setProperty('--label-size', newSize);
+        };
+
+        // Listen for zoom events to update text size
+        map.on('zoomend', updateLabelSize);
+        updateLabelSize(); // Run once on init
+
+        // Toggle Labels Checkbox
+    const showLabelsChk = document.getElementById('show-labels-chk');
+    const mapDiv = document.getElementById('map');
+
+    if (showLabelsChk) {
+        showLabelsChk.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                mapDiv.classList.add('labels-visible');
+            } else {
+                mapDiv.classList.remove('labels-visible');
+            }
+        });
+    }
     }
 
+    // --- UPDATED MARKER FUNCTION ---
     function updateMapWithPoints(points) {
         if (marker) marker.remove();
         markers.forEach(m => m.remove());
         markers = [];
         marker = null;
+
         if (!points || points.length === 0) return;
+
+        // Helper to create marker with label
+        const createMarker = (p) => {
+            if (!p.latitude || !p.longitude) return null;
+            
+            const m = L.marker([p.latitude, p.longitude]);
+            
+            // Bind the Tooltip (Label)
+            if (p.pointId) {
+                m.bindTooltip(String(p.pointId), {
+                    permanent: true,
+                    direction: 'right', // Text appears to the right of the pin
+                    offset: [12, -15],  // Offset to align nicely with marker head
+                    className: 'map-point-label' // The class we defined in CSS
+                });
+            }
+            return m;
+        };
+
         if (points.length === 1) {
-            const point = points[0];
-            if (point.latitude && point.longitude) {
-                marker = L.marker([point.latitude, point.longitude]).addTo(map);
-                map.setView([point.latitude, point.longitude], 15);
+            marker = createMarker(points[0]);
+            if (marker) {
+                marker.addTo(map);
+                map.setView([points[0].latitude, points[0].longitude], 15);
             }
-            return;
-        }
-        points.forEach(point => {
-            if (point.latitude && point.longitude) {
-                const newMarker = L.marker([point.latitude, point.longitude]);
-                markers.push(newMarker);
+        } else {
+            points.forEach(point => {
+                const newMarker = createMarker(point);
+                if (newMarker) markers.push(newMarker);
+            });
+
+            if (markers.length > 0) {
+                const featureGroup = L.featureGroup(markers).addTo(map);
+                map.fitBounds(featureGroup.getBounds().pad(0.1));
             }
-        });
-        if (markers.length > 0) {
-            const featureGroup = L.featureGroup(markers).addTo(map);
-            map.fitBounds(featureGroup.getBounds().pad(0.1));
         }
     }
+    // --- Open Map in New Window Logic ---
+    const openMapBtn = document.getElementById('open-map-btn');
+    
+    if (openMapBtn) {
+        openMapBtn.addEventListener('click', () => {
+            // 1. Capture current state
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
+            
+            // 2. Open new window
+            const newWindow = window.open("", "MapWindow", "width=1200,height=800");
+            
+            if (!newWindow) {
+                alert("Pop-up blocked! Please allow pop-ups for this site.");
+                return;
+            }
+
+            // 3. Collect point data to transfer
+            // We iterate through the hidden result table or our internal data to get points
+            const pointsToTransfer = [];
+            // We can reconstruct points from the table rows if we didn't save them globally. 
+            // Better yet, let's grab them from the table which is the source of truth for the UI.
+            const rows = resultTbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.cells;
+                if (cells.length > 0) {
+                    pointsToTransfer.push({
+                        pointId: cells[0].textContent,
+                        latitude: parseFloat(cells[4].textContent),
+                        longitude: parseFloat(cells[5].textContent)
+                    });
+                }
+            });
+
+            // 4. Write HTML to the new window
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <title>Full Page Map View</title>
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                    <style>
+                        body { margin: 0; padding: 0; }
+                        #full-map { width: 100vw; height: 100vh; }
+                        
+                        /* Re-use your Label Styles */
+                        .map-point-label {
+                            background-color: rgba(0, 0, 0, 0.8);
+                            border: 1px solid rgba(255, 255, 255, 0.5);
+                            color: #fff;
+                            font-weight: 500;
+                            font-size: 12px; /* Fixed size or add dynamic logic if needed */
+                            padding: 2px 5px;
+                            border-radius: 4px;
+                            white-space: nowrap;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="full-map"></div>
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+                    <script>
+                        const map = L.map('full-map').setView([${currentCenter.lat}, ${currentCenter.lng}], ${currentZoom});
+                        
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
+
+                        L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+                        const points = ${JSON.stringify(pointsToTransfer)};
+                        const markers = [];
+
+                        points.forEach(p => {
+                            if(p.latitude && p.longitude) {
+                                const m = L.marker([p.latitude, p.longitude]).addTo(map);
+                                if(p.pointId) {
+                                    m.bindTooltip(String(p.pointId), {
+                                        permanent: true,
+                                        direction: 'right',
+                                        offset: [12, -15],
+                                        className: 'map-point-label'
+                                    });
+                                }
+                                markers.push(m);
+                            }
+                        });
+
+                        if(markers.length > 0) {
+                            const group = L.featureGroup(markers);
+                            // Only fit bounds if we aren't using the parent's exact view
+                            // map.fitBounds(group.getBounds()); 
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `);
+            newWindow.document.close(); // Important to finish loading
+        });
+    }
+
+    
 
     function downloadResults() {
         const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";
@@ -315,18 +474,37 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtn.disabled = true;
 
         Papa.parse(file, {
-            header: true, skipEmptyLines: true, worker: true,
+            header: false, // Changed to false to rely on column index, not name
+            skipEmptyLines: true, 
+            worker: true,
             step: (results) => {
                 const row = results.data;
+                
+                // 1. INPUT MAPPING (Strictly Columns A, B, C, D)
+                // Col A = ID, Col B = East/Lat, Col C = North/Lon, Col D = Height
+                const rawId = row[0];
+                const rawColB = parseFloat(row[1]); 
+                const rawColC = parseFloat(row[2]);
+                const rawColD = parseFloat(row[3]);
+
+                // 2. INTELLIGENT HEADER DETECTION
+                // If Column B or C are NOT numbers, assume this is a header row and skip it.
+                if (isNaN(rawColB) || isNaN(rawColC)) {
+                    return; 
+                }
+
+                const pointId = rawId || 'N/A';
+                
                 let E_osgb, N_osgb, H_osgb, lat, lon, H_etrs, E_lsg, N_lsg, H_lsg;
                 let finalResult = null;
                 let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected;
-                const pointId = row['Point ID'] || 'N/A';
 
                 switch (selectedMode) {
                     case 'osgb':
-                        E_osgb = parseFloat(row.Easting); N_osgb = parseFloat(row.Northing); H_osgb = parseFloat(row.Height) || 0;
-                        if (isNaN(E_osgb) || isNaN(N_osgb)) return;
+                        E_osgb = rawColB; 
+                        N_osgb = rawColC; 
+                        H_osgb = isNaN(rawColD) ? 0 : rawColD;
+
                         etrsProjected = iterativeTransform(E_osgb, N_osgb);
                         if (etrsProjected) {
                             shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
@@ -342,9 +520,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                         break;
+
                     case 'etrs':
-                        lat = parseFloat(row.Latitude); lon = parseFloat(row.Longitude); H_etrs = parseFloat(row.Height) || 0;
-                        if (isNaN(lat) || isNaN(lon)) return;
+                        lat = rawColB; 
+                        lon = rawColC; 
+                        H_etrs = isNaN(rawColD) ? 0 : rawColD;
+
                         etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                         shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
                         if (shifts) {
@@ -357,9 +538,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                         }
                         break;
+
                     case 'lsg':
-                        E_lsg = parseFloat(row.Easting); N_lsg = parseFloat(row.Northing); H_lsg = parseFloat(row.Height) || 0;
-                        if (isNaN(E_lsg) || isNaN(N_lsg)) return;
+                        E_lsg = rawColB; 
+                        N_lsg = rawColC; 
+                        H_lsg = isNaN(rawColD) ? 0 : rawColD;
+
                         H_osgb = H_lsg - 100.0;
                         lsgGeo = convertProjectedToGeodetic(E_lsg, N_lsg, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
                         const tempETRSforShift = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
@@ -404,6 +588,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (allResults.length > 0) {
                      downloadBtn.disabled = false;
                      updateMapWithPoints(allResults);
+                } else {
+                     // If no results, user likely uploaded a file that had no numbers in Col B/C
+                     alert("No valid coordinates found in Columns B and C. Please check your CSV format.");
                 }
             }
         });

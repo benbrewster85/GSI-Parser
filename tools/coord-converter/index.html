@@ -135,9 +135,18 @@
                         </form>
                     </div>
 
-                    <div class="advanced-group"> <h4>3. Map View</h4>
-                        <div id="map" style="height: 100%; min-height: 435px;"></div>
-                    </div>
+                    <div class="advanced-group">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h4 style="margin: 0;">3. Map View</h4>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <label class="checkbox-label" style="font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" id="show-labels-chk"> Show Point IDs
+            </label>
+            <button id="open-map-btn" class="btn" style="padding: 2px 8px; font-size: 12px;">↗ New Window</button>
+        </div>
+    </div>
+    <div id="map" style="height: 100%; min-height: 435px;"></div>
+</div>
                 </div>
             </div>
 

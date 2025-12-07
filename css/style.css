@@ -657,3 +657,40 @@ tr:hover {
 .about-content {
   margin-top: 40px;
 }
+
+/* Dynamic Point Label Styles */
+.map-point-label {
+  background-color: rgba(0, 0, 0, 0.8); /* Dark background for contrast */
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font-weight: 500;
+  /* The font-size is controlled by a CSS variable set by JS */
+  font-size: var(--label-size, 12px);
+  line-height: 1.2;
+  padding: 2px 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* Let clicks pass through to the map */
+  white-space: nowrap;
+  display: none; /* Hidden by default */
+}
+
+/* Only show labels when the parent map container has this class */
+.labels-visible .map-point-label {
+  display: block;
+}
+
+/* Subtle Map Scale Bar */
+.leaflet-control-scale-line {
+  background: rgba(255, 255, 255, 0.6) !important; /* Semi-transparent */
+  border: 1px solid #999 !important; /* Softer border */
+  border-top: none !important; /* Classic scale look */
+  color: #333 !important;
+  font-size: 10px !important; /* Smaller text */
+  font-weight: 500;
+  line-height: 1.2 !important;
+  padding: 2px 5px !important;
+  box-shadow: none !important; /* Remove heavy shadow */
+  margin-bottom: 5px !important;
+  margin-left: 5px !important;
+}
