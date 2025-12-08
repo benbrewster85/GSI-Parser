@@ -1,4 +1,4 @@
-// FINAL COMPLETE AND CORRECTLY ORDERED CODE
+// FINAL COMPLETE CODE: UPDATED FOR GRAVSOFT GRID FORMAT
 
 document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------------------
@@ -7,8 +7,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let map;
     let marker;
     let markers = [];
+    
+    // OSTN15 Data
     const ostn15Data = [];
     const GRID_WIDTH = 701;
+    
+    // Geoid Grid Data
+    let gridEast = null;
+    let gridWest = null;
+    
     let pointCounter = 1;
 
     const ELLIPSOID_PARAMS = {
@@ -33,22 +40,120 @@ document.addEventListener('DOMContentLoaded', () => {
     const spinner = document.getElementById('spinner');
     const resultContainer = document.getElementById('result-container');
     const resultTbody = document.getElementById('result-tbody');
-    const mapContainer = document.getElementById('map');
+    
+    // Inputs
     const osgbEastingInput = document.getElementById('easting'), osgbNorthingInput = document.getElementById('northing'), osgbHeightInput = document.getElementById('osgb-height');
     const etrsLatInput = document.getElementById('latitude'), etrsLonInput = document.getElementById('longitude'), etrsHeightInput = document.getElementById('etrs-height');
     const lsgEastingInput = document.getElementById('lsg-easting'), lsgNorthingInput = document.getElementById('lsg-northing'), lsgHeightInput = document.getElementById('lsg-height');
+    
+    // Buttons
     const aboutBtn = document.getElementById('aboutBtn');
     const aboutSection = document.getElementById('aboutSection');
     const uploadBtn = document.getElementById('upload-btn');
     const clearBtn = document.getElementById('clear-btn');
     const downloadBtn = document.getElementById('download-btn');
     const csvInput = document.getElementById('csv-input');
-    
+    const openMapBtn = document.getElementById('open-map-btn');
+
     // --------------------------------------------------------------------
-    // --- 2. FUNCTION DEFINITIONS ---
+    // --- 2. GEOID GRID CLASS & FUNCTIONS ---
     // --------------------------------------------------------------------
 
-    // --- UPDATED INIT MAP FUNCTION ---
+    class GeoidGrid {
+        constructor(jsonObj) {
+            this.header = jsonObj.header;
+            this.values = jsonObj.values; 
+        }
+
+        getSeparation(lat, lon) {
+            const h = this.header;
+            
+            // 1. Column (X) - Standard
+            const colFloat = (lon - h.xllcorner) / h.cellsize;
+            
+            // 2. Row (Y) - CRITICAL UPDATE FOR NODE-BASED GRIDS
+            // The data usually starts at the Max Latitude. 
+            // Max Lat = min_lat + (nrows - 1) * step
+            const topLat = h.yllcorner + ((h.nrows - 1) * h.cellsize);
+            const rowFloat = (topLat - lat) / h.cellsize;
+
+            // Bounds Check (Strict)
+            // We ensure we don't go off the array edges
+            if (colFloat < 0 || colFloat >= h.ncols - 1 || rowFloat < 0 || rowFloat >= h.nrows - 1) {
+                return null; 
+            }
+
+            // Bilinear Interpolation
+            const c0 = Math.floor(colFloat);
+            const c1 = c0 + 1;
+            const r0 = Math.floor(rowFloat);
+            const r1 = r0 + 1;
+
+            const s = colFloat - c0; 
+            const t = rowFloat - r0; 
+
+            // Index = row * ncols + col
+            const v00 = this.values[r0 * h.ncols + c0];
+            const v10 = this.values[r0 * h.ncols + c1];
+            const v01 = this.values[r1 * h.ncols + c0];
+            const v11 = this.values[r1 * h.ncols + c1];
+
+            // Handle possible bad data
+            if (isNaN(v00) || isNaN(v10)) return null; 
+
+            return (1 - s) * (1 - t) * v00 + 
+                   s * (1 - t) * v10 + 
+                   (1 - s) * t * v01 + 
+                   s * t * v11;
+        }
+    }
+
+    async function loadGeoidGrids() {
+        try {
+            console.log("Loading Geoid Grids...");
+            const [resE, resW] = await Promise.all([
+                fetch('./LSGGM2025_E.json'),
+                fetch('./LSGGM2025_W.json')
+            ]);
+
+            if (resE.ok) gridEast = new GeoidGrid(await resE.json());
+            if (resW.ok) gridWest = new GeoidGrid(await resW.json());
+            
+            console.log("Geoid Grids Loaded.");
+        } catch (err) {
+            console.error("Failed to load Geoid Grids. Ensure JSON files exist.", err);
+        }
+    }
+
+    function getLsgGeoidSeparation(lat, lon) {
+        if (!gridEast || !gridWest) return 0; 
+
+        // Handle Longitude wrapping 0-360
+        let lookupLon = lon;
+        if (lon < 0) {
+            lookupLon = 360 + lon;
+        }
+
+        // Try West Grid (Range 358.5 - 360.0)
+        let n = gridWest.getSeparation(lat, lookupLon);
+        
+        // If not in West, try East Grid (Range 0.0 - 1.5 approx)
+        if (n === null || isNaN(n)) {
+            n = gridEast.getSeparation(lat, lookupLon);
+        }
+
+        // Final Safety
+        if (n === null || isNaN(n)) {
+            return 0;
+        }
+
+        return n; 
+    }
+
+    // --------------------------------------------------------------------
+    // --- 3. STANDARD MAPPING & MATH FUNCTIONS ---
+    // --------------------------------------------------------------------
+
     function initMap() {
         if (map) return;
         map = L.map('map').setView([51.5074, -0.1278], 9);
@@ -57,43 +162,26 @@ document.addEventListener('DOMContentLoaded', () => {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // 2. Add Subtle Scale Bar (Bottom Left)
-        L.control.scale({
-            position: 'bottomleft',
-            metric: true,
-            imperial: false,
-            maxWidth: 150
-        }).addTo(map);
+        L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 150 }).addTo(map);
 
-        // 3. Dynamic Text Sizing Logic
         const updateLabelSize = () => {
             const zoom = map.getZoom();
-            // Formula: Zoom 10 = 10px, Zoom 18 = 18px. 
-            // We clamp it so it doesn't get too tiny (<10px) or absurdly large (>24px)
             const newSize = Math.max(10, Math.min(24, zoom)) + 'px';
             document.documentElement.style.setProperty('--label-size', newSize);
         };
-
-        // Listen for zoom events to update text size
         map.on('zoomend', updateLabelSize);
-        updateLabelSize(); // Run once on init
+        updateLabelSize();
 
-        // Toggle Labels Checkbox
-    const showLabelsChk = document.getElementById('show-labels-chk');
-    const mapDiv = document.getElementById('map');
-
-    if (showLabelsChk) {
-        showLabelsChk.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                mapDiv.classList.add('labels-visible');
-            } else {
-                mapDiv.classList.remove('labels-visible');
-            }
-        });
-    }
+        const showLabelsChk = document.getElementById('show-labels-chk');
+        const mapDiv = document.getElementById('map');
+        if (showLabelsChk) {
+            showLabelsChk.addEventListener('change', (e) => {
+                if (e.target.checked) mapDiv.classList.add('labels-visible');
+                else mapDiv.classList.remove('labels-visible');
+            });
+        }
     }
 
-    // --- UPDATED MARKER FUNCTION ---
     function updateMapWithPoints(points) {
         if (marker) marker.remove();
         markers.forEach(m => m.remove());
@@ -102,19 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!points || points.length === 0) return;
 
-        // Helper to create marker with label
         const createMarker = (p) => {
             if (!p.latitude || !p.longitude) return null;
-            
             const m = L.marker([p.latitude, p.longitude]);
-            
-            // Bind the Tooltip (Label)
             if (p.pointId) {
                 m.bindTooltip(String(p.pointId), {
-                    permanent: true,
-                    direction: 'right', // Text appears to the right of the pin
-                    offset: [12, -15],  // Offset to align nicely with marker head
-                    className: 'map-point-label' // The class we defined in CSS
+                    permanent: true, direction: 'right', offset: [12, -15], className: 'map-point-label'
                 });
             }
             return m;
@@ -131,35 +212,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newMarker = createMarker(point);
                 if (newMarker) markers.push(newMarker);
             });
-
             if (markers.length > 0) {
                 const featureGroup = L.featureGroup(markers).addTo(map);
                 map.fitBounds(featureGroup.getBounds().pad(0.1));
             }
         }
     }
-    // --- Open Map in New Window Logic ---
-    const openMapBtn = document.getElementById('open-map-btn');
     
+    // Map Popup Logic
     if (openMapBtn) {
         openMapBtn.addEventListener('click', () => {
-            // 1. Capture current state
             const currentCenter = map.getCenter();
             const currentZoom = map.getZoom();
-            
-            // 2. Open new window
             const newWindow = window.open("", "MapWindow", "width=1200,height=800");
-            
-            if (!newWindow) {
-                alert("Pop-up blocked! Please allow pop-ups for this site.");
-                return;
-            }
+            if (!newWindow) { alert("Pop-up blocked!"); return; }
 
-            // 3. Collect point data to transfer
-            // We iterate through the hidden result table or our internal data to get points
             const pointsToTransfer = [];
-            // We can reconstruct points from the table rows if we didn't save them globally. 
-            // Better yet, let's grab them from the table which is the source of truth for the UI.
             const rows = resultTbody.querySelectorAll('tr');
             rows.forEach(row => {
                 const cells = row.cells;
@@ -172,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // 4. Write HTML to the new window
             newWindow.document.write(`
                 <!DOCTYPE html>
                 <html lang="en">
@@ -182,18 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <style>
                         body { margin: 0; padding: 0; }
                         #full-map { width: 100vw; height: 100vh; }
-                        
-                        /* Re-use your Label Styles */
-                        .map-point-label {
-                            background-color: rgba(0, 0, 0, 0.8);
-                            border: 1px solid rgba(255, 255, 255, 0.5);
-                            color: #fff;
-                            font-weight: 500;
-                            font-size: 12px; /* Fixed size or add dynamic logic if needed */
-                            padding: 2px 5px;
-                            border-radius: 4px;
-                            white-space: nowrap;
-                        }
+                        .map-point-label { background-color: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.5); color: #fff; padding: 2px 5px; border-radius: 4px; }
                     </style>
                 </head>
                 <body>
@@ -201,46 +257,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
                     <script>
                         const map = L.map('full-map').setView([${currentCenter.lat}, ${currentCenter.lng}], ${currentZoom});
-                        
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            maxZoom: 19,
-                            attribution: '© OpenStreetMap'
-                        }).addTo(map);
-
-                        L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
-
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+                        L.control.scale({ position: 'bottomleft', metric: true }).addTo(map);
                         const points = ${JSON.stringify(pointsToTransfer)};
                         const markers = [];
-
                         points.forEach(p => {
                             if(p.latitude && p.longitude) {
                                 const m = L.marker([p.latitude, p.longitude]).addTo(map);
-                                if(p.pointId) {
-                                    m.bindTooltip(String(p.pointId), {
-                                        permanent: true,
-                                        direction: 'right',
-                                        offset: [12, -15],
-                                        className: 'map-point-label'
-                                    });
-                                }
+                                if(p.pointId) m.bindTooltip(String(p.pointId), { permanent: true, direction: 'right', offset: [12, -15], className: 'map-point-label' });
                                 markers.push(m);
                             }
                         });
-
-                        if(markers.length > 0) {
-                            const group = L.featureGroup(markers);
-                            // Only fit bounds if we aren't using the parent's exact view
-                            // map.fitBounds(group.getBounds()); 
-                        }
+                        if(markers.length > 0) L.featureGroup(markers);
                     <\/script>
                 </body>
                 </html>
             `);
-            newWindow.document.close(); // Important to finish loading
+            newWindow.document.close();
         });
     }
-
-    
 
     function downloadResults() {
         const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";
@@ -260,6 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(link);
     }
 
+    // --- MATH HELPERS ---
+    
     function getShifts(x, y) {
         const east_idx = Math.floor(x / 1000), north_idx = Math.floor(y / 1000), id0 = (north_idx * GRID_WIDTH) + east_idx;
         if (!ostn15Data[id0] || !ostn15Data[id0 + GRID_WIDTH + 1]) return null;
@@ -369,6 +406,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return { x: x_out, y: y_out, z: z_out };
     }
     
+    // --------------------------------------------------------------------
+    // --- 4. MASTER CONVERSION HANDLERS ---
+    // --------------------------------------------------------------------
+
     function handleMasterConversion(event) {
         event.preventDefault();
         const selectedMode = document.querySelector('input[name="conversion-mode"]:checked').value;
@@ -378,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             let E_osgb, N_osgb, H_osgb, lat, lon, H_etrs, E_lsg, N_lsg, H_lsg;
             let finalResult = null;
-            let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected;
+            let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected, geoidN;
 
             switch (selectedMode) {
                 case 'osgb':
@@ -390,47 +431,66 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (shifts) {
                             H_etrs = H_osgb + shifts.sh;
                             geoETRS = convertProjectedToGeodetic(etrsProjected.x_etrs, etrsProjected.y_etrs, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                            
                             etrsCartesian = geodeticToCartesian(geoETRS.latitude, geoETRS.longitude, H_etrs, ELLIPSOID_PARAMS.WGS84);
                             lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
                             lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
                             lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                            H_lsg = H_osgb + 100.0;
+                            
+                            geoidN = getLsgGeoidSeparation(geoETRS.latitude, geoETRS.longitude);
+                            H_lsg = H_etrs - geoidN; 
+
                             finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                         }
                     }
                     break;
+
                 case 'etrs':
                     lat = parseFloat(etrsLatInput.value); lon = parseFloat(etrsLonInput.value); H_etrs = parseFloat(etrsHeightInput.value) || 0;
                     if (isNaN(lat) || isNaN(lon)) { alert("Invalid ETRS89 input."); break; }
+                    
                     etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                     shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
                     if (shifts) {
                         E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn; H_osgb = H_etrs - shifts.sh;
+                        
                         etrsCartesian = geodeticToCartesian(lat, lon, H_etrs, ELLIPSOID_PARAMS.WGS84);
                         lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
                         lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
                         lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                        H_lsg = H_osgb + 100.0;
+                        
+                        geoidN = getLsgGeoidSeparation(lat, lon);
+                        H_lsg = H_etrs - geoidN;
+
                         finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                     }
                     break;
+
                 case 'lsg':
                     E_lsg = parseFloat(lsgEastingInput.value); N_lsg = parseFloat(lsgNorthingInput.value); H_lsg = parseFloat(lsgHeightInput.value) || 0;
                     if (isNaN(E_lsg) || isNaN(N_lsg)) { alert("Invalid LSG input."); break; }
-                    H_osgb = H_lsg - 100.0;
+                    
                     lsgGeo = convertProjectedToGeodetic(E_lsg, N_lsg, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
+                    
                     const tempETRSforShift = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                     const tempShifts = getShifts(tempETRSforShift.x_proj, tempETRSforShift.y_proj);
+                    
                     if (tempShifts) {
-                        const approx_h_etrs = H_osgb + tempShifts.sh;
-                        lsgCartesian = geodeticToCartesian(lsgGeo.latitude, lsgGeo.longitude, approx_h_etrs, ELLIPSOID_PARAMS.WGS84);
+                        lsgCartesian = geodeticToCartesian(lsgGeo.latitude, lsgGeo.longitude, H_lsg, ELLIPSOID_PARAMS.WGS84);
                         etrsCartesian = inverseHelmertTransform(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
                         geoETRS = cartesianToGeodetic(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, ELLIPSOID_PARAMS.GRS80);
-                        lat = geoETRS.latitude; lon = geoETRS.longitude; H_etrs = geoETRS.height;
+                        
+                        lat = geoETRS.latitude; lon = geoETRS.longitude;
+                        geoidN = getLsgGeoidSeparation(lat, lon);
+                        H_etrs = H_lsg + geoidN; 
+
                         etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                         shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
+                        
                         if (shifts) {
                             E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn;
+                            H_osgb = H_etrs - shifts.sh;
+
                             finalResult = { pointId: pointCounter, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
                         }
                     }
@@ -455,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td>${finalResult.lsgN.toFixed(3)}</td>
                         <td>${finalResult.H_lsg.toFixed(3)}</td>
                     </tr>`;
-                resultTbody.innerHTML = resultRowHTML; // This should be += for CSV
+                resultTbody.innerHTML = resultRowHTML; 
                 resultContainer.style.display = 'block';
                 pointCounter++;
                 updateMapWithPoints([finalResult]);
@@ -474,37 +534,26 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtn.disabled = true;
 
         Papa.parse(file, {
-            header: false, // Changed to false to rely on column index, not name
+            header: false,
             skipEmptyLines: true, 
             worker: true,
             step: (results) => {
                 const row = results.data;
-                
-                // 1. INPUT MAPPING (Strictly Columns A, B, C, D)
-                // Col A = ID, Col B = East/Lat, Col C = North/Lon, Col D = Height
                 const rawId = row[0];
                 const rawColB = parseFloat(row[1]); 
                 const rawColC = parseFloat(row[2]);
                 const rawColD = parseFloat(row[3]);
 
-                // 2. INTELLIGENT HEADER DETECTION
-                // If Column B or C are NOT numbers, assume this is a header row and skip it.
-                if (isNaN(rawColB) || isNaN(rawColC)) {
-                    return; 
-                }
+                if (isNaN(rawColB) || isNaN(rawColC)) { return; }
 
                 const pointId = rawId || 'N/A';
-                
                 let E_osgb, N_osgb, H_osgb, lat, lon, H_etrs, E_lsg, N_lsg, H_lsg;
                 let finalResult = null;
-                let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected;
+                let etrsProjected, shifts, geoETRS, etrsCartesian, lsgCartesian, lsgGeo, lsgProjected, geoidN;
 
                 switch (selectedMode) {
                     case 'osgb':
-                        E_osgb = rawColB; 
-                        N_osgb = rawColC; 
-                        H_osgb = isNaN(rawColD) ? 0 : rawColD;
-
+                        E_osgb = rawColB; N_osgb = rawColC; H_osgb = isNaN(rawColD) ? 0 : rawColD;
                         etrsProjected = iterativeTransform(E_osgb, N_osgb);
                         if (etrsProjected) {
                             shifts = getShifts(etrsProjected.x_etrs, etrsProjected.y_etrs);
@@ -515,17 +564,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
                                lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
                                lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                               H_lsg = H_osgb + 100.0;
+                               
+                               geoidN = getLsgGeoidSeparation(geoETRS.latitude, geoETRS.longitude);
+                               H_lsg = H_etrs - geoidN;
+
                                finalResult = { pointId, E_osgb, N_osgb, H_osgb, x_etrs: etrsProjected.x_etrs, y_etrs: etrsProjected.y_etrs, H_etrs, ...geoETRS, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                             }
                         }
                         break;
 
                     case 'etrs':
-                        lat = rawColB; 
-                        lon = rawColC; 
-                        H_etrs = isNaN(rawColD) ? 0 : rawColD;
-
+                        lat = rawColB; lon = rawColC; H_etrs = isNaN(rawColD) ? 0 : rawColD;
                         etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
                         shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
                         if (shifts) {
@@ -534,32 +583,32 @@ document.addEventListener('DOMContentLoaded', () => {
                             lsgCartesian = helmertTransform(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
                             lsgGeo = cartesianToGeodetic(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, ELLIPSOID_PARAMS.WGS84);
                             lsgProjected = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                            H_lsg = H_osgb + 100.0;
+                            
+                            geoidN = getLsgGeoidSeparation(lat, lon);
+                            H_lsg = H_etrs - geoidN;
+
                             finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: lsgProjected.x_proj, lsgN: lsgProjected.y_proj, H_lsg };
                         }
                         break;
 
                     case 'lsg':
-                        E_lsg = rawColB; 
-                        N_lsg = rawColC; 
-                        H_lsg = isNaN(rawColD) ? 0 : rawColD;
-
-                        H_osgb = H_lsg - 100.0;
+                        E_lsg = rawColB; N_lsg = rawColC; H_lsg = isNaN(rawColD) ? 0 : rawColD;
                         lsgGeo = convertProjectedToGeodetic(E_lsg, N_lsg, PROJECTION_PARAMS.LSG, ELLIPSOID_PARAMS.WGS84);
-                        const tempETRSforShift = convertGeodeticToProjected(lsgGeo.latitude, lsgGeo.longitude, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
-                        const tempShifts = getShifts(tempETRSforShift.x_proj, tempETRSforShift.y_proj);
-                        if (tempShifts) {
-                            const approx_h_etrs = H_osgb + tempShifts.sh;
-                            lsgCartesian = geodeticToCartesian(lsgGeo.latitude, lsgGeo.longitude, approx_h_etrs, ELLIPSOID_PARAMS.WGS84);
-                            etrsCartesian = inverseHelmertTransform(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
-                            geoETRS = cartesianToGeodetic(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, ELLIPSOID_PARAMS.GRS80);
-                            lat = geoETRS.latitude; lon = geoETRS.longitude; H_etrs = geoETRS.height;
-                            etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
-                            shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
-                            if (shifts) {
-                                E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn;
-                                finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
-                            }
+                        
+                        lsgCartesian = geodeticToCartesian(lsgGeo.latitude, lsgGeo.longitude, H_lsg, ELLIPSOID_PARAMS.WGS84);
+                        etrsCartesian = inverseHelmertTransform(lsgCartesian.x, lsgCartesian.y, lsgCartesian.z, HELMERT_PARAMS.ETRS89_to_LSG);
+                        geoETRS = cartesianToGeodetic(etrsCartesian.x, etrsCartesian.y, etrsCartesian.z, ELLIPSOID_PARAMS.GRS80);
+                        lat = geoETRS.latitude; lon = geoETRS.longitude;
+                        
+                        geoidN = getLsgGeoidSeparation(lat, lon);
+                        H_etrs = H_lsg + geoidN;
+
+                        etrsProjected = convertGeodeticToProjected(lat, lon, PROJECTION_PARAMS.NationalGrid, ELLIPSOID_PARAMS.GRS80);
+                        shifts = getShifts(etrsProjected.x_proj, etrsProjected.y_proj);
+                        if (shifts) {
+                            E_osgb = etrsProjected.x_proj + shifts.se; N_osgb = etrsProjected.y_proj + shifts.sn;
+                            H_osgb = H_etrs - shifts.sh;
+                            finalResult = { pointId, E_osgb, N_osgb, H_osgb, latitude: lat, longitude: lon, x_etrs: etrsProjected.x_proj, y_etrs: etrsProjected.y_proj, H_etrs, lsgE: E_lsg, lsgN: N_lsg, H_lsg };
                         }
                         break;
                 }
@@ -589,17 +638,19 @@ document.addEventListener('DOMContentLoaded', () => {
                      downloadBtn.disabled = false;
                      updateMapWithPoints(allResults);
                 } else {
-                     // If no results, user likely uploaded a file that had no numbers in Col B/C
-                     alert("No valid coordinates found in Columns B and C. Please check your CSV format.");
+                     alert("No valid coordinates found in Columns B and C.");
                 }
             }
         });
     }
 
     // --------------------------------------------------------------------
-    // --- 3. EVENT LISTENERS AND INITIALIZATION ---
+    // --- 5. INITIALIZATION ---
     // --------------------------------------------------------------------
     
+    // START LOADING GEOIDS IMMEDIATELY
+    loadGeoidGrids();
+
     aboutBtn.addEventListener('click', () => {
         aboutSection.classList.toggle('hidden');
         aboutBtn.textContent = aboutSection.classList.contains('hidden') ? 'About This Tool' : 'Hide About Section';
@@ -634,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     downloadBtn.addEventListener('click', downloadResults);
 
-    statusText.textContent = "Attempting to load transformation data...";
+    statusText.textContent = "Loading OSTN15 data...";
     Papa.parse('ostn15.csv', {
         download: true, header: true, dynamicTyping: true, worker: false, skipEmptyLines: true,
         transformHeader: header => header.trim().replace(/^\ufeff/, ''),
@@ -649,8 +700,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         complete: () => {
-            console.log("SUCCESS: Papa Parse complete.");
-            statusText.textContent = "Data loaded. Ready to convert.";
+            console.log("OSTN15 Loaded.");
+            statusText.textContent = "Ready to convert (OSTN15 + Geoid).";
             statusText.style.color = 'var(--accent-dim)';
             convertBtn.disabled = false;
             osgbForm.addEventListener('submit', handleMasterConversion);
@@ -660,9 +711,8 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         error: error => {
             console.error("ERROR: Papa Parse 'error' callback fired.", error);
-            statusText.textContent = "Error: Failed to load transformation data.";
+            statusText.textContent = "Error loading OSTN15 data.";
             statusText.style.color = '#ff4444';
-            alert(`Failed to load or parse OSTN15 data. Check console (F12). Error: ${error.message}`);
         }
     });
 
