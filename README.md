@@ -1,1 +1,17 @@
 # GSI-Parser
+
+# Coord Converter
+
+OSGB36 <-> LSG ConverterA web-based tool for high-precision 3D coordinate conversion between OSGB36 (National Grid), ETRS89, and London Survey Grid (LSG).This application uses rigorous geodetic transformation methods, including the OSTN15 transformation grid for National Grid conversions and the specific LSGGM2025 geoid model for London Survey Grid vertical adjustments.FeaturesBidirectional Conversion: Convert E/N/H between all three coordinate systems.Survey-Grade Accuracy:2D: Uses OSTN15 bilinear interpolation for OSGB36 <-> ETRS89.3D: Uses a custom bilinear interpolation parser for the LSGGM2025 geoid grid to derive precise LSG levels.Batch Processing: Upload CSV files to convert hundreds of points instantly.Interactive Map: Visualizes transformed points on a Leaflet.js map.Zero Dependencies (Runtime): The final app runs entirely in the browser using vanilla JavaScript (ES6) and a local JSON store.Project StructurePlaintext/
+├── index.html # Main UI
+├── converter.js # Core logic (Geoid parsing, Helmert, Projections)
+├── styles.css # (Optional) Stylesheet if external
+├── ostn15.csv # Official OS transformation grid
+├── LSGGM2025*E.json # Processed East Geoid Grid (JSON format)
+├── LSGGM2025_W.json # Processed West Geoid Grid (JSON format)
+├── grid_to_json.py # Python utility to convert raw .grd to .json
+└── README.md # This file
+Setup & Initialization1. PrerequisitesThe web app is static, but the Geoid Grid files (.grd) provided by TfL must be pre-processed into JSON to ensure performance and prevent browser freezing.2. Processing the Geoid FilesThe raw .grd files (Gravsoft format) are too heavy to parse effectively in real-time JavaScript. We use a Python script to convert them into optimized JSON arrays.Place your raw LSGGM2025_E.grd and LSGGM2025_W.grd files in the root folder.Run the provided Python script:Bashpython3 grid_to_json.py
+This will generate LSGGM2025_E.json and LSGGM2025_W.json.Note: The script automatically handles the specific Gravsoft header format (MinLat MaxLat ...) and normalizes it for the JavaScript interpolator.3. Running the AppSince the app fetches local JSON and CSV files, strict browser security (CORS) will block it if you just double-click index.html. You must run it via a local server.Using Python (simplest method):Bash# Run this inside the project folder
+python3 -m http.server 8000
+Then open your browser to http://localhost:8000.Technical MethodologyHorizontal (2D)OSGB36 <-> ETRS89: Performed using the OSTN15 transformation. The app loads ostn15.csv and performs bilinear interpolation to determine the Easting/Northing shifts at the specific location.ETRS89 <-> LSG: Performed using a standard 7-parameter Helmert Transformation followed by a Transverse Mercator projection using the parameters defined in TfL Standard S1026.Vertical (Z)OSGB36 Levels: derived using the OSGM15 geoid model (approximated via OSTN15 height shifts).LSG Levels: derived using the LSGGM2025 model.The app loads the grid JSONs into memory.It determines which grid (East or West) covers the coordinate.It performs Bilinear Interpolation on the grid cells to find the precise Geoid Separation ($N$).Formula: $H*{LSG} = h\_{ETRS89} - N$ValidationThe tool has been validated against the test data provided in the S1026 specification document.Horizontal Accuracy: < 1mm discrepancy vs control data.Vertical Accuracy: ~2mm discrepancy vs control data (within acceptable bounds for OSTN15 floating-point operations).AuthorsBuilt for London Survey Grid conversion requirements (2025).
