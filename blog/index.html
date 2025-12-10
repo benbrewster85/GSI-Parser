@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - News & Updates</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        .blog-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        
+        /* CARD STYLING */
+        .post-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: block;
+        }
+        .post-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+        
+        .post-meta { 
+            font-size: 12px; color: var(--text-dim); margin-bottom: 8px; 
+            display: flex; justify-content: space-between;
+        }
+        .post-title { 
+            font-size: 20px; color: var(--accent); margin-bottom: 10px; font-weight: bold; 
+        }
+        .post-excerpt { 
+            color: var(--text); font-size: 14px; line-height: 1.6;
+            display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .read-more-badge {
+            display: inline-block; margin-top: 15px; font-size: 12px;
+            color: var(--bg); background: var(--text-dim);
+            padding: 2px 8px; border-radius: 4px; font-weight: bold;
+        }
+        .post-card:hover .read-more-badge { background: var(--accent); }
+
+        /* ERROR MESSAGE */
+        .error-msg {
+            text-align: center; color: #ff3b30; border: 1px solid #ff3b30; 
+            padding: 20px; border-radius: 8px; background: rgba(255,59,48,0.1);
+        }
+
+        /* LOADING SPINNER (Was missing previously) */
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--surface);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                <a href="/resources.html">Resources</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+
+    <div class="blog-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1 class="section-title" style="margin: 0;">News & Updates</h1>
+            <a href="https://bensurveytools.substack.com/subscribe" target="_blank" class="btn" style="font-size: 12px;">Subscribe ↗</a>
+        </div>
+
+        <div id="postsList">
+            <div class="loading-spinner" style="display:block; margin: 50px auto;"></div>
+        </div>
+    </div>
+
+    <script src="../js/main.js"></script>
+    <script>
+        const SUBSTACK_URL = 'https://bensurveytools.substack.com'; 
+        
+        const app = {
+            async init() {
+                const container = document.getElementById('postsList');
+                
+                try {
+                    // Cache Buster: Adds a unique timestamp (&t=...) to force rss2json to fetch fresh data
+                    const cacheBuster = "force_reload_" + Math.random();
+                    const feedUrl = `https://api.rss2json.com/v1/api.json?rss_url=${SUBSTACK_URL}/feed&t=${cacheBuster}`;
+                    
+                    console.log('Fetching feed from:', feedUrl); // Check Console if this fails
+
+                    const res = await fetch(feedUrl);
+                    const data = await res.json();
+
+                    if (data.status !== 'ok') {
+                        console.error('API Error:', data);
+                        throw new Error('Feed status not OK');
+                    }
+
+                    // Handle empty items array
+                    if (!data.items || data.items.length === 0) {
+                        container.innerHTML = `
+                            <div class="error-msg" style="border-color: var(--accent); color: var(--accent); background: rgba(0,255,100,0.1);">
+                                <p>No posts found yet.</p>
+                                <p style="font-size:12px; margin-top:5px;">Check back soon!</p>
+                            </div>`;
+                        return;
+                    }
+
+                    container.innerHTML = data.items.map(post => {
+                        const dateObj = new Date(post.pubDate);
+                        const dateStr = dateObj.toLocaleDateString('en-GB', { 
+                            day: 'numeric', month: 'long', year: 'numeric' 
+                        });
+
+                        // Strip HTML from description for the excerpt
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = post.description;
+                        const textSnippet = tempDiv.textContent || tempDiv.innerText || "";
+
+                        return `
+                        <a href="${post.link}" target="_blank" class="post-card">
+                            <div class="post-meta">
+                                <span>${dateStr}</span>
+                                <span>Substack ↗</span>
+                            </div>
+                            <div class="post-title">${post.title}</div>
+                            <div class="post-excerpt">${textSnippet}</div>
+                            <span class="read-more-badge">Read Article</span>
+                        </a>
+                        `;
+                    }).join('');
+
+                } catch (e) {
+                    console.error('Fetch failed:', e);
+                    container.innerHTML = `
+                        <div class="error-msg">
+                            <p>Unable to connect to news feed.</p>
+                            <a href="${SUBSTACK_URL}" target="_blank" class="btn primary" style="margin-top:10px; display:inline-block;">Visit Blog Directly</a>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        app.init();
+    </script>
+</body>
+</html>
