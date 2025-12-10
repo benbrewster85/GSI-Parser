@@ -90,62 +90,83 @@
         const app = {
             async init() {
                 const container = document.getElementById('postsList');
+                container.innerHTML = '<div class="loading-spinner" style="display:block; margin: 50px auto;"></div>';
                 
                 try {
-                    // Cache Buster: Adds a unique timestamp (&t=...) to force rss2json to fetch fresh data
-                    const cacheBuster = "force_reload_" + Math.random();
-                    const feedUrl = `https://api.rss2json.com/v1/api.json?rss_url=${SUBSTACK_URL}/feed&t=${cacheBuster}`;
+                    // 1. Define the Feed URL
+                    const feedUrl = `${SUBSTACK_URL}/feed`;
                     
-                    console.log('Fetching feed from:', feedUrl); // Check Console if this fails
+                    // 2. Use CORSProxy.io (Faster & more reliable than AllOrigins)
+                    // We encode the feed URL so it passes correctly
+                    const proxyUrl = `https://corsproxy.io/?` + encodeURIComponent(feedUrl);
+                    
+                    console.log(`Attempting to fetch: ${proxyUrl}`);
 
-                    const res = await fetch(feedUrl);
-                    const data = await res.json();
-
-                    if (data.status !== 'ok') {
-                        console.error('API Error:', data);
-                        throw new Error('Feed status not OK');
+                    const res = await fetch(proxyUrl);
+                    
+                    if (!res.ok) {
+                        throw new Error(`Proxy Error: ${res.status} ${res.statusText}`);
                     }
 
-                    // Handle empty items array
-                    if (!data.items || data.items.length === 0) {
+                    const xmlText = await res.text();
+
+                    // 3. Parse the XML
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    
+                    // Check for XML parsing errors
+                    const parseError = xmlDoc.querySelector("parsererror");
+                    if (parseError) {
+                        throw new Error("Received invalid XML from Substack");
+                    }
+
+                    const items = Array.from(xmlDoc.querySelectorAll("item"));
+
+                    // 4. Handle Empty Feed
+                    if (items.length === 0) {
                         container.innerHTML = `
-                            <div class="error-msg" style="border-color: var(--accent); color: var(--accent); background: rgba(0,255,100,0.1);">
-                                <p>No posts found yet.</p>
-                                <p style="font-size:12px; margin-top:5px;">Check back soon!</p>
+                            <div class="error-msg">
+                                <p>Feed loaded but contains 0 items.</p>
+                                <p style="font-size:12px; margin-top:5px;">
+                                    If you just published your first post, wait 10 minutes for Substack's cache to clear.
+                                </p>
                             </div>`;
                         return;
                     }
 
-                    container.innerHTML = data.items.map(post => {
-                        const dateObj = new Date(post.pubDate);
+                    // 5. Render Posts
+                    container.innerHTML = items.map(item => {
+                        const title = item.querySelector("title").textContent;
+                        const link = item.querySelector("link").textContent;
+                        const pubDate = item.querySelector("pubDate").textContent;
+                        
+                        // Extract text snippet from HTML description
+                        const descriptionHTML = item.querySelector("description").textContent;
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = descriptionHTML;
+                        const textSnippet = tempDiv.textContent || tempDiv.innerText || "";
+
+                        const dateObj = new Date(pubDate);
                         const dateStr = dateObj.toLocaleDateString('en-GB', { 
                             day: 'numeric', month: 'long', year: 'numeric' 
                         });
 
-                        // Strip HTML from description for the excerpt
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = post.description;
-                        const textSnippet = tempDiv.textContent || tempDiv.innerText || "";
-
                         return `
-                        <a href="${post.link}" target="_blank" class="post-card">
-                            <div class="post-meta">
-                                <span>${dateStr}</span>
-                                <span>Substack ↗</span>
-                            </div>
-                            <div class="post-title">${post.title}</div>
+                        <a href="${link}" target="_blank" class="post-card">
+                            <div class="post-meta"><span>${dateStr}</span><span>Substack ↗</span></div>
+                            <div class="post-title">${title}</div>
                             <div class="post-excerpt">${textSnippet}</div>
                             <span class="read-more-badge">Read Article</span>
-                        </a>
-                        `;
+                        </a>`;
                     }).join('');
 
                 } catch (e) {
-                    console.error('Fetch failed:', e);
+                    console.error("Feed Error:", e);
                     container.innerHTML = `
                         <div class="error-msg">
-                            <p>Unable to connect to news feed.</p>
-                            <a href="${SUBSTACK_URL}" target="_blank" class="btn primary" style="margin-top:10px; display:inline-block;">Visit Blog Directly</a>
+                            <p><strong>Connection Failed</strong></p>
+                            <p style="font-size:12px; margin-bottom:15px;">${e.message}</p>
+                            <a href="${SUBSTACK_URL}" target="_blank" class="btn primary" style="display:inline-block;">Visit Blog Directly</a>
                         </div>
                     `;
                 }
