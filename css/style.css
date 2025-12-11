@@ -694,3 +694,52 @@ tr:hover {
   margin-bottom: 5px !important;
   margin-left: 5px !important;
 }
+/* Mobile Menu Button - Hidden on Desktop */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+/* Mobile Styling Overrides */
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block; /* Show hamburger on mobile */
+  }
+
+  .nav-links {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: 60px; /* Height of your header */
+    left: 0;
+    width: 100%;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 10px 0;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  /* This class is added by JS to show the menu */
+  .nav-links.active {
+    display: flex;
+  }
+
+  .nav-links a {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border); /* Dividers between links */
+    margin-left: 0 !important; /* Override default margin */
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .nav-links a:last-child {
+    border-bottom: none;
+  }
+}
