@@ -743,3 +743,12 @@ tr:hover {
     border-bottom: none;
   }
 }
+
+.nav-links a.nav-active {
+  color: var(--accent); /* Neon green/blue depending on theme */
+  font-weight: bold; /* Make it stand out */
+  pointer-events: none; /* Disable clicking */
+  cursor: default; /* Change cursor to arrow instead of hand */
+  opacity: 1; /* Ensure it's fully visible */
+  //border-bottom: 2px solid var(--accent); /* Optional: Underline effect */
+}
