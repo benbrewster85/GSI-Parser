@@ -1,24 +1,22 @@
 /**
  * SurveyTools: Resection Analysis Module
  * Adapted for Retro Theme
- * * UPGRADE NOTE: Now uses a 3x3 Matrix for Free Station (Unknown Orientation).
- * * ADDED: Dynamic Scale Bar for spatial context.
+ * * UPGRADE NOTE: Hybrid Input System (Mouse + Touch)
+ * * 3x3 Matrix for Free Station (Unknown Orientation)
+ * * Dynamic Scale Bar & Grid
  */
 
 class ResectionMath {
     calculate(stn, targets, config) {
         // RULE 1: Free Station Logic (Unknown Orientation)
-        // If Distance is OFF, we need 3 points minimum.
         if (!config.useDist && targets.length < 3) return null;
 
         // RULE 2: Basic Geometry
-        // Even with distance, we need at least 2 points.
         if (targets.length < 2) return null;
 
         const rad = deg => deg * Math.PI / 180;
         const deg = r => r * 180 / Math.PI;
         
-        // 3x3 Normal Matrix (dE, dN, dOr)
         let N = [[0,0,0], [0,0,0], [0,0,0]]; 
 
         targets.forEach(t => {
@@ -30,7 +28,7 @@ class ResectionMath {
 
             const az = Math.atan2(dx, dy);
 
-            // 1. ANGLE (dAz/dE, dAz/dN, dAz/dOr = -1)
+            // 1. ANGLE
             const sigAng = rad(config.angleSec / 3600);
             const wAng = 1 / (sigAng ** 2);
             
@@ -42,7 +40,7 @@ class ResectionMath {
             N[1][0] += a_N * wAng * a_E; N[1][1] += a_N * wAng * a_N; N[1][2] += a_N * wAng * a_O;
             N[2][0] += a_O * wAng * a_E; N[2][1] += a_O * wAng * a_N; N[2][2] += a_O * wAng * a_O;
 
-            // 2. DISTANCE (If Enabled)
+            // 2. DISTANCE
             if (config.useDist) {
                 const ppmFactor = config.distPpm / 1000000;
                 const sigDist = (config.distMm / 1000) + (dist * ppmFactor); 
@@ -50,23 +48,19 @@ class ResectionMath {
 
                 const d_E = -Math.sin(az); 
                 const d_N = -Math.cos(az);
-                // dOr is 0 for distance
 
                 N[0][0] += d_E * wDist * d_E; N[0][1] += d_E * wDist * d_N;
                 N[1][0] += d_N * wDist * d_E; N[1][1] += d_N * wDist * d_N;
             }
         });
 
-        // Invert 3x3
         const Q = this.invert3x3(N);
         if (!Q) return null;
 
-        // Extract 2x2 for Ellipse
         const varE = Q[0][0];
         const varN = Q[1][1];
         const covEN = Q[0][1];
 
-        // Eigen Decomposition
         const term1 = (varE + varN) / 2;
         const term2 = Math.sqrt(((varE - varN) / 2) ** 2 + covEN ** 2);
         
@@ -119,7 +113,7 @@ const app = {
 
     // State
     width: 0, height: 0, cx: 0, cy: 0, 
-    scale: 4, // Pixels per meter
+    scale: 4, 
     stn: { x: 0, y: 0 },
     targets: [
         { x: -40, y: 30, id: 1 },
@@ -142,7 +136,7 @@ const app = {
             this.draw();
         }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-        // Bind Controls
+        // Bind Sliders
         const bind = (id, prop, lbl, unit) => {
             const el = document.getElementById(id);
             if(!el) return;
@@ -162,9 +156,16 @@ const app = {
             this.draw();
         });
 
+        // --- MOUSE LISTENERS ---
         this.cvs.addEventListener('mousedown', e => this.onDown(e));
         window.addEventListener('mousemove', e => this.onMove(e));
         window.addEventListener('mouseup', e => this.onUp(e));
+
+        // --- TOUCH LISTENERS (Restored) ---
+        // Passive: false allows us to call preventDefault() to stop scrolling when dragging
+        this.cvs.addEventListener('touchstart', e => this.onDown(e), { passive: false });
+        window.addEventListener('touchmove', e => this.onMove(e), { passive: false });
+        window.addEventListener('touchend', e => this.onUp(e));
 
         this.resize();
     },
@@ -212,28 +213,41 @@ const app = {
     toScr(wx, wy) { return { x: this.cx + (wx * this.scale), y: this.cy - (wy * this.scale) }; },
     toWorld(sx, sy) { return { x: (sx - this.cx) / this.scale, y: (this.cy - sy) / this.scale }; },
     
-    getMousePos(e) {
+    // Unified Pointer Handler (Mouse + Touch)
+    getPointerPos(e) {
         const rect = this.cvs.getBoundingClientRect();
-        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        // Check if touch event or mouse event
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
     },
 
-    getHit(mx, my) {
+    getHit(mx, my, radius) {
         const sScr = this.toScr(this.stn.x, this.stn.y);
-        if (Math.hypot(mx - sScr.x, my - sScr.y) < 20) return 'stn';
+        if (Math.hypot(mx - sScr.x, my - sScr.y) < radius) return 'stn';
         for (let t of this.targets) {
             const tScr = this.toScr(t.x, t.y);
-            if (Math.hypot(mx - tScr.x, my - tScr.y) < 15) return t;
+            if (Math.hypot(mx - tScr.x, my - tScr.y) < radius) return t;
         }
         return null;
     },
 
     // --- INTERACTION ---
     onDown(e) {
-        const m = this.getMousePos(e);
-        const item = this.getHit(m.x, m.y);
+        const p = this.getPointerPos(e);
+        // Use 45px radius for touch (fat finger), 20px for mouse
+        const hitRadius = e.touches ? 45 : 20;
+        
+        const item = this.getHit(p.x, p.y, hitRadius);
+        
         if (item) {
+            // Prevent default only if we hit something (Stops scroll/zoom on mobile)
+            if (e.cancelable) e.preventDefault();
+            
             this.dragItem = item;
             document.body.style.cursor = 'grabbing';
+            
+            // Right Click or Shift Click deletion (Desktop only really)
             if (e.button === 2 || e.shiftKey) {
                 if (item !== 'stn') this.removePoint(item);
                 this.dragItem = null;
@@ -243,17 +257,25 @@ const app = {
     },
 
     onMove(e) {
-        const m = this.getMousePos(e);
+        const p = this.getPointerPos(e);
+
         if (this.dragItem) {
-            const wPos = this.toWorld(m.x, m.y);
+            // If dragging, prevent scroll on mobile
+            if (e.touches && e.cancelable) e.preventDefault();
+
+            const wPos = this.toWorld(p.x, p.y);
             if (this.dragItem === 'stn') { this.stn.x = wPos.x; this.stn.y = wPos.y; } 
             else { this.dragItem.x = wPos.x; this.dragItem.y = wPos.y; }
             this.draw();
             return;
         }
-        const hit = this.getHit(m.x, m.y);
-        this.hoverItem = hit;
-        this.cvs.style.cursor = hit ? 'grab' : 'crosshair';
+        
+        // Hover effects (Mouse only)
+        if (!e.touches) {
+            const hit = this.getHit(p.x, p.y, 20);
+            this.hoverItem = hit;
+            this.cvs.style.cursor = hit ? 'grab' : 'crosshair';
+        }
     },
 
     onUp() {
@@ -287,11 +309,9 @@ const app = {
         const ctx = this.ctx;
         const c = this.colors;
         
-        // 1. Clear & Background
         ctx.fillStyle = c.bg;
         ctx.fillRect(0, 0, this.width, this.height);
         
-        // 2. Grid (Dots)
         ctx.fillStyle = c.grid; 
         const gs = 50; 
         const offX = this.cx % gs; const offY = this.cy % gs;
@@ -301,7 +321,6 @@ const app = {
              }
         }
 
-        // 3. Axes
         ctx.strokeStyle = c.grid;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -311,7 +330,6 @@ const app = {
 
         const sScr = this.toScr(this.stn.x, this.stn.y);
 
-        // 4. Sight Lines
         ctx.strokeStyle = c.dim;
         ctx.setLineDash([2, 4]);
         ctx.beginPath();
@@ -323,7 +341,6 @@ const app = {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // 5. Targets
         this.targets.forEach(t => {
             const tScr = this.toScr(t.x, t.y);
             const isHover = (this.hoverItem === t);
@@ -337,7 +354,6 @@ const app = {
             ctx.fillText(`TP${t.id}`, tScr.x + 10, tScr.y - 5);
         });
 
-        // 6. Station
         const isStnHover = (this.hoverItem === 'stn');
         ctx.strokeStyle = '#007aff';
         ctx.lineWidth = 2;
@@ -348,7 +364,6 @@ const app = {
         ctx.closePath();
         ctx.stroke();
 
-        // 7. Ellipse
         const res = this.math.calculate(this.stn, this.targets, this.config);
         if (res) {
             this.updateStats(res);
@@ -367,12 +382,10 @@ const app = {
             this.updateStats(null);
         }
 
-        // 8. Scale Bar
         this.drawScaleBar(ctx);
     },
 
     drawScaleBar(ctx) {
-        // Draw a 20m scale bar in bottom left
         const barMeters = 20;
         const barPixels = barMeters * this.scale;
         
@@ -383,19 +396,16 @@ const app = {
         ctx.strokeStyle = this.colors.text;
         ctx.lineWidth = 2;
         
-        // Line
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x + barPixels, y);
         ctx.stroke();
         
-        // Ticks
         ctx.beginPath();
-        ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); // 0 tick
-        ctx.moveTo(x + barPixels, y - 5); ctx.lineTo(x + barPixels, y + 5); // 20m tick
+        ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); 
+        ctx.moveTo(x + barPixels, y - 5); ctx.lineTo(x + barPixels, y + 5);
         ctx.stroke();
         
-        // Text
         ctx.font = '11px "SF Mono", monospace';
         ctx.fillText(`${barMeters}m`, x + barPixels/2 - 10, y - 8);
     },
