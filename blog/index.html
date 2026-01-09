@@ -8,56 +8,103 @@
     <link rel="stylesheet" href="../css/style.css">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <style>
-        .blog-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-        
-        /* CARD STYLING */
-        .post-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 25px;
-            margin-bottom: 20px;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: block;
-        }
-        .post-card:hover { transform: translateY(-3px); border-color: var(--accent); }
-        
-        .post-meta { 
-            font-size: 12px; color: var(--text-dim); margin-bottom: 8px; 
-            display: flex; justify-content: space-between;
-        }
-        .post-title { 
-            font-size: 20px; color: var(--accent); margin-bottom: 10px; font-weight: bold; 
-        }
-        .post-excerpt { 
-            color: var(--text); font-size: 14px; line-height: 1.6;
-            display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3;
-            -webkit-box-orient: vertical; overflow: hidden;
-        }
-        .read-more-badge {
-            display: inline-block; margin-top: 15px; font-size: 12px;
-            color: var(--bg); background: var(--text-dim);
-            padding: 2px 8px; border-radius: 4px; font-weight: bold;
-        }
-        .post-card:hover .read-more-badge { background: var(--accent); }
+    .blog-container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+    
+    /* GRID LAYOUT */
+    #postsList {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 25px;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+    }
 
-        /* ERROR MESSAGE */
-        .error-msg {
-            text-align: center; color: #ff3b30; border: 1px solid #ff3b30; 
-            padding: 20px; border-radius: 8px; background: rgba(255,59,48,0.1);
-        }
+    /* CARD STYLING */
+    .post-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 25px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .post-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+    
+    .post-meta { 
+        font-size: 12px; color: var(--text-dim); margin-bottom: 12px; 
+        display: flex; justify-content: space-between;
+    }
+    .post-title { 
+        font-size: 20px; color: var(--accent); margin-bottom: 10px; font-weight: bold; line-height: 1.3;
+    }
+    .post-excerpt { 
+        color: var(--text); font-size: 14px; line-height: 1.6;
+        display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3;
+        -webkit-box-orient: vertical; overflow: hidden;
+        flex-grow: 1; 
+    }
+    .read-more-badge {
+        display: inline-block; margin-top: 20px; font-size: 12px;
+        color: var(--bg); background: var(--text-dim);
+        padding: 4px 10px; border-radius: 4px; font-weight: bold;
+        align-self: flex-start;
+    }
+    .post-card:hover .read-more-badge { background: var(--accent); }
 
-        /* LOADING SPINNER (Was missing previously) */
-        .loading-spinner {
-            width: 40px; height: 40px;
-            border: 3px solid var(--surface);
-            border-top: 3px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+    /* FEATURED POST (First item) */
+    .post-card.featured {
+        grid-column: 1 / -1; 
+        border-left: 5px solid var(--accent);
+    }
+    .post-card.featured .post-title { font-size: 24px; }
+
+    /* PAGINATION CONTROLS */
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+    }
+    .page-btn {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .page-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* UTILITIES */
+    .error-msg {
+        text-align: center; color: #ff3b30; border: 1px solid #ff3b30; 
+        padding: 20px; border-radius: 8px; background: rgba(255,59,48,0.1);
+        grid-column: 1 / -1;
+    }
+    .loading-spinner {
+        width: 40px; height: 40px;
+        border: 3px solid var(--surface);
+        border-top: 3px solid var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 50px auto;
+        grid-column: 1 / -1;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+        #postsList { grid-template-columns: 1fr; }
+        .post-card.featured .post-title { font-size: 20px; }
+    }
+</style>
 </head>
 <body>
 
@@ -86,82 +133,133 @@
         </div>
 
         <div id="postsList">
-            <div class="loading-spinner" style="display:block; margin: 50px auto;"></div>
-        </div>
+            </div>
+        
+        <div id="paginationControls" class="pagination-container">
+            </div>
     </div>
 
     <script src="../js/main.js"></script>
+
     <script>
         const SUBSTACK_URL = 'https://bensurveytools.substack.com'; 
         
-        const app = {
+        // Renamed 'app' to 'blogFeed' to prevent conflicts with main.js
+        const blogFeed = {
+            state: {
+                allPosts: [],
+                currentPage: 1,
+                postsPerPage: 6 
+            },
+
             async init() {
                 const container = document.getElementById('postsList');
-                container.innerHTML = '<div class="loading-spinner" style="display:block; margin: 50px auto;"></div>';
+                container.innerHTML = '<div class="loading-spinner"></div>';
                 
                 try {
-                    // TRICK: Add a random number to the Substack URL itself.
-                    // This forces the API to go fetch a new copy instead of using its cache.
                     const uniqueNum = Math.floor(Math.random() * 10000);
                     const sourceUrl = `${SUBSTACK_URL}/feed?cache_bust=${uniqueNum}`;
-                    
-                    // Call the API with this "fresh" URL
                     const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(sourceUrl)}`;
                     
-                    console.log("Fetching fresh feed from:", apiUrl);
-
                     const res = await fetch(apiUrl);
                     const data = await res.json();
 
-                    // Error Check
-                    if (data.status !== 'ok') throw new Error('API reported status: ' + data.status);
+                    if (data.status !== 'ok') throw new Error('API Error');
+                    if (!data.items || data.items.length === 0) throw new Error('No items found');
 
-                    // Empty Check
-                    if (!data.items || data.items.length === 0) {
-                        // If still empty, we log the raw data to console for inspection
-                        console.warn("API returned 0 items. Raw Data:", data);
-                        container.innerHTML = `
-                            <div class="error-msg">
-                                <p>Feed is live but API sees 0 items.</p>
-                                <p style="font-size:12px">This is a persistent caching issue. Please wait 15 mins.</p>
-                            </div>`;
-                        return;
-                    }
-
-                    // Render Posts
-                    container.innerHTML = data.items.map(post => {
-                        const dateObj = new Date(post.pubDate);
-                        const dateStr = dateObj.toLocaleDateString('en-GB', { 
-                            day: 'numeric', month: 'long', year: 'numeric' 
-                        });
-
-                        // Clean HTML tags from description
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = post.description;
-                        const textSnippet = tempDiv.textContent || tempDiv.innerText || "";
-
-                        return `
-                        <a href="${post.link}" target="_blank" class="post-card">
-                            <div class="post-meta"><span>${dateStr}</span><span>Substack ↗</span></div>
-                            <div class="post-title">${post.title}</div>
-                            <div class="post-excerpt">${textSnippet}</div>
-                            <span class="read-more-badge">Read Article</span>
-                        </a>`;
-                    }).join('');
+                    this.state.allPosts = data.items;
+                    this.renderPage(1);
 
                 } catch (e) {
-                    console.error("Feed Logic Error:", e);
+                    console.error("Feed Error:", e);
                     container.innerHTML = `
                         <div class="error-msg">
-                            <p>Unable to load news.</p>
+                            <p>Unable to load news feed.</p>
                             <a href="${SUBSTACK_URL}" target="_blank" class="btn primary" style="margin-top:10px; display:inline-block;">Visit Blog Directly</a>
                         </div>
                     `;
                 }
+            },
+
+            renderPage(page) {
+                this.state.currentPage = page;
+                const container = document.getElementById('postsList');
+                const paginationContainer = document.getElementById('paginationControls');
+                
+                const start = (page - 1) * this.state.postsPerPage;
+                const end = start + this.state.postsPerPage;
+                const paginatedItems = this.state.allPosts.slice(start, end);
+
+                container.innerHTML = '';
+                if(page > 1) container.scrollIntoView({ behavior: 'smooth' });
+
+                container.innerHTML = paginatedItems.map((post, index) => {
+                    const dateObj = new Date(post.pubDate);
+                    const dateStr = dateObj.toLocaleDateString('en-GB', { 
+                        day: 'numeric', month: 'long', year: 'numeric' 
+                    });
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = post.description;
+                    const textSnippet = tempDiv.textContent || tempDiv.innerText || "";
+
+                    // First item on Page 1 is "Featured"
+                    const isFeatured = (page === 1 && index === 0);
+                    const featuredClass = isFeatured ? 'featured' : '';
+
+                    return `
+                    <a href="${post.link}" target="_blank" class="post-card ${featuredClass}">
+                        <div class="post-meta"><span>${dateStr}</span><span>Substack ↗</span></div>
+                        <div class="post-title">${post.title}</div>
+                        <div class="post-excerpt">${textSnippet}</div>
+                        <span class="read-more-badge">Read Article</span>
+                    </a>`;
+                }).join('');
+
+                this.renderPagination(paginationContainer);
+            },
+
+            renderPagination(container) {
+                const totalPages = Math.ceil(this.state.allPosts.length / this.state.postsPerPage);
+                
+                if (totalPages <= 1) {
+                    container.style.display = 'none';
+                    return;
+                }
+                container.style.display = 'flex';
+                
+                let buttonsHtml = '';
+
+                buttonsHtml += `
+                    <button class="page-btn" 
+                        onclick="blogFeed.renderPage(${this.state.currentPage - 1})"
+                        ${this.state.currentPage === 1 ? 'disabled' : ''}>
+                        &larr; Prev
+                    </button>
+                `;
+
+                for (let i = 1; i <= totalPages; i++) {
+                    buttonsHtml += `
+                        <button class="page-btn ${i === this.state.currentPage ? 'active' : ''}" 
+                            onclick="blogFeed.renderPage(${i})">
+                            ${i}
+                        </button>
+                    `;
+                }
+
+                buttonsHtml += `
+                    <button class="page-btn" 
+                        onclick="blogFeed.renderPage(${this.state.currentPage + 1})"
+                        ${this.state.currentPage === totalPages ? 'disabled' : ''}>
+                        Next &rarr;
+                    </button>
+                `;
+
+                container.innerHTML = buttonsHtml;
             }
         };
 
-        app.init();
+        blogFeed.init();
     </script>
 </body>
 </html>
