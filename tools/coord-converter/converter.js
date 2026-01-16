@@ -202,13 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Set Default Layers (Transport Map + Tracks is a good default for this tool)
-        transportMap.addTo(map);
+        osmStandard.addTo(map);
 
         // --- 3. LAYER CONTROL ---
         
         const baseMaps = {
-            "Transport (Tube/Bus)": transportMap,
             "Standard Street": osmStandard,
+            "Transport (Tube/Bus)": transportMap,
             "Satellite (Esri)": satellite,
             "Dark Mode (Carto)": darkMatter
         };
