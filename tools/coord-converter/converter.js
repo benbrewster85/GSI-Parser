@@ -156,11 +156,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initMap() {
         if (map) return;
-        map = L.map('map').setView([51.5074, -0.1278], 9);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        map = L.map('map').setView([51.5074, -0.1278], 10); // Default to London Zoom
+
+        // --- 1. BASE MAPS (Backgrounds - Select One) ---
+        
+        const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
+        });
+
+        // Transport Map (ÖPNVKarte) - Highlights Tube Lines & Stations nicely
+        const transportMap = L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; ÖPNVKarte | &copy; OpenStreetMap'
+        });
+
+        // Esri Satellite - Critical for referencing physical ground features
+        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri'
+        });
+
+        // CartoDB Dark Matter - High contrast, good for overlaying colored data points
+        const darkMatter = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20,
+            attribution: '&copy; CartoDB'
+        });
+
+        // --- 2. OVERLAYS (Transparent Layers - Stack on top) ---
+
+        // OpenRailwayMap - The "Surveyor's View" of the tracks
+        const railTracks = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenRailwayMap'
+        });
+
+        const railSignals = L.tileLayer('https://{s}.tiles.openrailwaymap.org/signals/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenRailwayMap'
+        });
+
+        const railMaxSpeed = L.tileLayer('https://{s}.tiles.openrailwaymap.org/maxspeed/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenRailwayMap'
+        });
+
+        // Set Default Layers (Transport Map + Tracks is a good default for this tool)
+        transportMap.addTo(map);
+
+        // --- 3. LAYER CONTROL ---
+        
+        const baseMaps = {
+            "Transport (Tube/Bus)": transportMap,
+            "Standard Street": osmStandard,
+            "Satellite (Esri)": satellite,
+            "Dark Mode (Carto)": darkMatter
+        };
+
+        const overlayMaps = {
+            "Show Rail/Tube Tracks": railTracks,
+            "Show Rail Signals": railSignals,
+            "Show Line Speeds": railMaxSpeed
+        };
+
+        L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
+
+        // --- END LAYER SETUP ---
 
         L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 150 }).addTo(map);
 
@@ -257,8 +318,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
                     <script>
                         const map = L.map('full-map').setView([${currentCenter.lat}, ${currentCenter.lng}], ${currentZoom});
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+                        
+                        // Base Maps
+                        const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+                        const transportMap = L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© ÖPNVKarte' });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' });
+                        const darkMatter = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, attribution: '© CartoDB' });
+
+                        // Overlays
+                        const railTracks = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
+                        const railSignals = L.tileLayer('https://{s}.tiles.openrailwaymap.org/signals/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
+                        
+                        transportMap.addTo(map); // Default
+
+                        L.control.layers({
+                            "Transport": transportMap,
+                            "Standard": osmStandard,
+                            "Satellite": satellite,
+                            "Dark Mode": darkMatter
+                        }, {
+                            "Rail Tracks": railTracks,
+                            "Rail Signals": railSignals
+                        }).addTo(map);
+
                         L.control.scale({ position: 'bottomleft', metric: true }).addTo(map);
+                        
                         const points = ${JSON.stringify(pointsToTransfer)};
                         const markers = [];
                         points.forEach(p => {
