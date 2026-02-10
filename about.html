@@ -7,23 +7,29 @@
     <link rel="stylesheet" href="../../css/style.css">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+    <style>
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+    </style>
 </head>
 <body>
     <nav class="global-nav">
         <div class="nav-container">
-    <a href="/" class="nav-logo">🛰️ Survey Tools</a>
-    
-    <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">
-        ☰
-    </button>
-
-    <div class="nav-links" id="navLinks">
-        <a href="/">Home</a>
-        <a href="/about.html" class="nav-active">About</a>
-        <a href="/resources.html">Resources</a>
-        <a href="/blog/index.html">Blog & News</a>
-    </div>
-</div>
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">
+                ☰
+            </button>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/about.html" class="nav-active">About</a>
+                <a href="/resources.html">Resources</a>
+                <a href="/blog/index.html">Blog & News</a>
+            </div>
+        </div>
         <button class="theme-btn" id="themeBtn">🌓</button>
     </nav>
 
@@ -51,6 +57,7 @@
                     <p>More tools are coming soon, so stay tuned!</p><br>
                     <p>If you have a specific idea, requirement or just want to get in touch:<a href="mailto:ben@surveytools.co.uk">Email Us</a></p>
                 </div>
+            </div>
 
             <div class="section">
                 <div class="about-content">
@@ -63,7 +70,7 @@
             </div>
 
             <div class="section">
-            <div style="max-height: 400px; overflow-y: auto;">
+                <div style="max-height: 400px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -112,9 +119,11 @@
                     </table>
                 </div>
             </div>
+        </main>
 
-    <div class="footer">
-        © Survey Tools 2025
+        <div class="footer">
+            © Survey Tools 2025
+        </div>
     </div>
 
     <script src="../../js/main.js"></script>
