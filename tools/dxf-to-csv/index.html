@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - DXF Extractor</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <style>
+        /* Specific tweaks for the new layout */
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .settings-container {
+            width: 100%;
+            margin-top: 15px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <div class="nav-links" id="navLinks">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/resources.html">Resources</a>
+        <a href="/blog/index.html">Blog & News</a>
+    </div>
+            <button class="mobile-menu-btn">☰</button>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+    
+    <div class="container">
+        <div class="local-header">
+            <div class="local-header-container">
+                <h2>DXF Data Extractor</h2>
+                <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+            </div>
+        </div>
+
+        <div class="section hidden" id="aboutSection">
+            <div class="advanced-content">
+                <h3>About DXF Extractor</h3>
+                <p>This tool parses standard DXF files to extract geometry and metadata into a clean CSV format.</p>
+                <br>
+                <h4>Features:</h4>
+                <ul>
+                    <li><strong>Smart Parsing:</strong> Automatically detects Points, Text, Lines, and Blocks.</li>
+                    <li><strong>Privacy First:</strong> All processing happens in your browser. No files are uploaded.</li>
+                </ul>
+                <br>
+                <strong>Note:</strong> This tool is still in beta. Please report any issues you encounter.
+                <br>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="upload-area" id="uploadArea" role="button" tabindex="0">
+                <div id="dropIcon" style="font-size: 36px; margin-bottom: 10px;">📂</div>
+                <div id="dropText">Click to Select DXF File</div>
+                <div id="dropSubtext" style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">
+                    Supports .dxf (ASCII)
+                </div>
+                <input type="file" id="fileInput" class="file-input" accept=".dxf,.txt">
+            </div>
+            <div id="status" class="status hidden" role="alert"></div>
+        </div>
+
+        <div class="section hidden" id="resultsSection">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="countTotal">0</div>
+                    <div class="stat-label">Total Rows</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="countLayers">0</div>
+                    <div class="stat-label">Layers Found</div>
+                </div>
+            </div>
+
+            <div class="actions" style="margin-top: 20px;">
+                <button class="btn primary" id="downloadBtn">💾 Download CSV</button>
+                <button class="btn" id="toggleSettingsBtn">⚙️ Advanced Settings</button>
+                <button class="btn" onclick="window.location.reload()">🔄 Reset</button>
+            </div>
+
+            <div class="advanced-content hidden" id="settingsPanel" style="margin-top: 15px;">
+                <div class="advanced-grid">
+                    <div class="advanced-group">
+                        <h4>Geometry</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optPoints" checked> Points & Vertices
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optLines"> Lines (Start/End)
+                        </label>
+                    </div>
+                    <div class="advanced-group">
+                        <h4>Metadata</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optText" checked> Text & Annotations
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="optInserts"> Blocks/Inserts
+                        </label>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border);">
+                    <button class="btn primary" id="reprocessBtn">🔄 Reprocess with Changes</button>
+                </div>
+            </div>
+
+            <div class="data-table" style="margin-top: 20px;">
+                <div class="table-header">Data Preview (First 50 Rows)</div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Layer</th>
+                                <th>X / Easting</th>
+                                <th>Y / Northing</th>
+                                <th>Z / Elev</th>
+                                <th>Content / Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">© Survey Tools 2026</div>
+    </div>
+
+    <script>
+    // --- Theme Logic (Handles Init & Toggling) ---
+    const themeBtn = document.getElementById('themeBtn');
+    
+    // 1. Check LocalStorage on Load
+    const savedTheme = localStorage.getItem('theme') || 'dark'; 
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // 2. Toggle & Save
+    themeBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme); 
+    });
+
+    // --- DXF Parsing Logic ---
+    let currentFileContent = null;
+    let currentFileName = "";
+
+    class DXFExtractor {
+        constructor() {
+            this.data = [];
+            this.layers = new Set();
+        }
+
+        parse(text, options) {
+            this.data = [];
+            this.layers.clear();
+            
+            const lines = text.split(/\r?\n/).map(l => l.trim());
+            let i = 0;
+            const getVal = (idx) => idx + 1 < lines.length ? lines[idx+1] : "";
+
+            while (i < lines.length) {
+                const code = lines[i];
+                const val = getVal(i);
+
+                if (code === "0") {
+                    const type = val.toUpperCase();
+                    
+                    if (options.points && (type === "POINT" || type === "VERTEX")) {
+                        i = this._extractEntity(type, lines, i + 2);
+                        continue;
+                    }
+                    if (options.text && (type === "TEXT" || type === "MTEXT")) {
+                        i = this._extractEntity(type, lines, i + 2);
+                        continue;
+                    }
+                    if (options.lines && type === "LINE") {
+                        i = this._extractEntity(type, lines, i + 2);
+                        continue;
+                    }
+                    if (options.inserts && type === "INSERT") {
+                        i = this._extractEntity(type, lines, i + 2);
+                        continue;
+                    }
+                }
+                i += 2;
+            }
+            return this.data;
+        }
+
+        _extractEntity(type, lines, startIndex) {
+            let entity = { 
+                type: type, layer: "0", 
+                x: null, y: null, z: null, 
+                x2: null, y2: null, z2: null, content: "" 
+            };
+            
+            let j = startIndex;
+            while (j < lines.length) {
+                const code = lines[j];
+                const val = lines[j+1]; 
+                
+                if (code === "0") break; 
+
+                if (code === "10") entity.x = parseFloat(val);
+                if (code === "20") entity.y = parseFloat(val);
+                if (code === "30") entity.z = parseFloat(val);
+                if (code === "11") entity.x2 = parseFloat(val);
+                if (code === "21") entity.y2 = parseFloat(val);
+                if (code === "31") entity.z2 = parseFloat(val);
+                
+                if (code === "8") {
+                    entity.layer = val;
+                    this.layers.add(val);
+                }
+                if (code === "1") entity.content += val; 
+                if (code === "3") entity.content += val;
+                if (code === "2" && type === "INSERT") entity.content = val;
+
+                j += 2;
+            }
+
+            if (entity.x !== null) {
+                this.data.push(entity);
+                if (type === "LINE") {
+                   entity.content = `Length: ${this._dist(entity).toFixed(3)}m`;
+                }
+            }
+            return j;
+        }
+
+        _dist(e) {
+            if (e.x2 === null) return 0;
+            return Math.sqrt(Math.pow(e.x2-e.x, 2) + Math.pow(e.y2-e.y, 2));
+        }
+
+        exportCSV() {
+            let csv = "Type,Layer,X,Y,Z,Content_or_EndCoords\n";
+            this.data.forEach(d => {
+                let extra = d.content;
+                if (d.type === "LINE") {
+                    extra = `End: ${d.x2.toFixed(3)} ${d.y2.toFixed(3)} ${d.z2.toFixed(3)}`;
+                }
+                extra = extra ? extra.replace(/,/g, ' ').replace(/\n/g, ' ') : "";
+                csv += `${d.type},${d.layer},${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)},${extra}\n`;
+            });
+            return csv;
+        }
+    }
+
+    // --- UI Controller ---
+    const extractor = new DXFExtractor();
+    const el = {
+        fileInput: document.getElementById('fileInput'),
+        uploadArea: document.getElementById('uploadArea'),
+        dropText: document.getElementById('dropText'),
+        dropSubtext: document.getElementById('dropSubtext'),
+        dropIcon: document.getElementById('dropIcon'),
+        status: document.getElementById('status'),
+        resultsSection: document.getElementById('resultsSection'),
+        dataTable: document.getElementById('dataTable'),
+        aboutBtn: document.getElementById('aboutBtn'),
+        aboutSection: document.getElementById('aboutSection'),
+        toggleSettingsBtn: document.getElementById('toggleSettingsBtn'),
+        settingsPanel: document.getElementById('settingsPanel'),
+        reprocessBtn: document.getElementById('reprocessBtn'),
+        optPoints: document.getElementById('optPoints'),
+        optText: document.getElementById('optText'),
+        optLines: document.getElementById('optLines'),
+        optInserts: document.getElementById('optInserts'),
+    };
+
+    // Toggle Views
+    el.aboutBtn.onclick = () => el.aboutSection.classList.toggle('hidden');
+    el.toggleSettingsBtn.onclick = () => {
+        el.settingsPanel.classList.toggle('hidden');
+        el.toggleSettingsBtn.classList.toggle('primary'); // Visual feedback
+    };
+
+    // Core Processing
+    const runExtraction = () => {
+        if (!currentFileContent) return;
+
+        const options = {
+            points: el.optPoints.checked,
+            text: el.optText.checked,
+            lines: el.optLines.checked,
+            inserts: el.optInserts.checked
+        };
+
+        const data = extractor.parse(currentFileContent, options);
+        
+        if (data.length === 0) {
+            el.status.textContent = "No data found with current settings. Try selecting more options in 'Advanced Settings'.";
+            el.status.style.color = "var(--warning)";
+        } else {
+            el.status.textContent = `Success! Extracted ${data.length} items from ${currentFileName}.`;
+            el.status.style.color = "var(--accent)";
+        }
+        updateUI(data);
+    };
+
+    // Handle File Load
+    const processFile = (file) => {
+        if (!file) return;
+        currentFileName = file.name;
+        
+        // Update UI
+        el.dropText.textContent = `File Loaded: ${file.name}`;
+        el.dropText.style.fontWeight = "bold";
+        el.dropSubtext.textContent = "Click to change file";
+        el.dropIcon.textContent = "✅";
+        el.uploadArea.style.borderColor = "var(--accent)";
+
+        el.status.classList.remove('hidden');
+        el.status.textContent = `Reading ${file.name}...`;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            currentFileContent = event.target.result;
+            setTimeout(runExtraction, 50); 
+        };
+        reader.readAsText(file);
+    };
+
+    el.reprocessBtn.onclick = () => {
+        el.status.textContent = "Reprocessing...";
+        setTimeout(runExtraction, 50);
+    };
+
+    el.uploadArea.onclick = () => el.fileInput.click();
+    el.fileInput.onchange = (e) => processFile(e.target.files[0]);
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        el.uploadArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        el.uploadArea.addEventListener(eventName, () => el.uploadArea.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        el.uploadArea.addEventListener(eventName, () => el.uploadArea.classList.remove('dragover'), false);
+    });
+
+    el.uploadArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        processFile(dt.files[0]);
+    }, false);
+
+    function updateUI(data) {
+        document.getElementById('countTotal').textContent = data.length;
+        document.getElementById('countLayers').textContent = extractor.layers.size;
+        el.resultsSection.classList.remove('hidden');
+
+        el.dataTable.innerHTML = data.slice(0, 50).map(d => `
+            <tr>
+                <td><span class="type-badge">${d.type}</span></td>
+                <td>${d.layer}</td>
+                <td class="numeric">${d.x.toFixed(3)}</td>
+                <td class="numeric">${d.y.toFixed(3)}</td>
+                <td class="numeric">${d.z.toFixed(3)}</td>
+                <td>${d.content || '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    document.getElementById('downloadBtn').onclick = () => {
+        const csvContent = extractor.exportCSV();
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${currentFileName}_extract.csv`;
+        a.click();
+    };
+    </script>
+</body>
+</html>
