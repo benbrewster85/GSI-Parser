@@ -282,6 +282,31 @@
                         <label class="form-label" for="benchmarkValue">Known Elevation (m):</label>
                         <input type="number" id="benchmarkValue" class="form-input" step="0.001" placeholder="e.g., 100.000">
                     </div>
+
+                    <div class="advanced-group">
+                        <h4>Adjustment Settings</h4>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="applyAdjustment">
+                            <span>Apply Linear Adjustment</span>
+                        </label>
+                        
+                        <div id="adjustmentSettings" style="display: none; margin-top: 10px; margin-bottom: 15px; padding-left: 25px; border-left: 2px solid var(--border);">
+                            <label class="form-label">Distribution Method:</label>
+                            <label class="checkbox-label" style="margin-top: 5px;">
+                                <input type="radio" name="adjustmentMethod" value="distance" checked>
+                                <span>By Distance (Recommended)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="radio" name="adjustmentMethod" value="setups">
+                                <span>By Setups (Turns)</span>
+                            </label>
+                        </div>
+                        
+                        <div id="adjustmentWarning" class="status warning hidden" style="margin-top: 10px; font-size: 12px; padding: 8px;">
+                            <strong>⚠️ Complex Network Detected</strong><br>
+                            This run crosses itself (figure-8). Linear adjustment will force closure but may yield conflicting elevations at junction points. Rigorous least-squares (e.g., StarNet) is recommended.
+                        </div>
+                    </div>
                     
                     <div class="advanced-group">
                         <h4>Output Options</h4>
@@ -326,6 +351,7 @@
                                 <th>Distance</th>
                                 <th>Height</th>
                                 <th>Calculated RL</th>
+                                <th>Adjusted RL</th>
                                 <th>Setup</th>
                             </tr>
                         </thead>
@@ -444,7 +470,9 @@
                     retainCalibrationData: false,
                     tpsExportMode: 'meaned',
                     benchmarkPoint: '',
-                    benchmarkValue: null
+                    benchmarkValue: null,
+                    applyAdjustment: false,
+                    adjustmentMethod: 'distance'
                 };
                 
             }
@@ -556,29 +584,45 @@
                 
                 // Calculate reduced levels based on these runs
                 this.calculateReducedLevels();
+
+                if (this.processingOptions.applyAdjustment) {
+                    this.applyLinearAdjustment();
+                }
                 
                 // Aggregate change points
                 this.aggregatedRuns = this.aggregateChangePointRuns();
                 
                 // Gather statistics
                 const points = new Set();
-                const heights = [];
+                const calculatedHeights = [];
+                const rawHeights = [];
+                
                 this.data.forEach(record => {
                     if (record.words['11']) {
                         points.add(record.words['11'].value);
                     }
+                    
+                    // Collect calculated RLs
+                    if (record.calculatedRL !== undefined) {
+                        calculatedHeights.push(record.calculatedRL);
+                    }
+                    
+                    // Collect raw WI 83 heights
                     if (record.words['83']) {
-                        heights.push(record.words['83'].value);
+                        rawHeights.push(record.words['83'].value);
                     }
                 });
+                
+                // Strictly use calculated heights if available to prevent mixing shifted/unshifted data
+                const finalHeights = calculatedHeights.length > 0 ? calculatedHeights : rawHeights;
                 
                 this.stats = {
                     recordCount: this.data.length,
                     pointCount: points.size,
                     setupCount: this.levelRuns.length,
                     uniquePoints: Array.from(points),
-                    heightRange: heights.length > 0 ? 
-                        `${Math.min(...heights).toFixed(3)}m - ${Math.max(...heights).toFixed(3)}m` : '—',
+                    heightRange: finalHeights.length > 0 ? 
+                        `${Math.min(...finalHeights).toFixed(3)}m - ${Math.max(...finalHeights).toFixed(3)}m` : '—',
                     method: this.detectMethod()
                 };
             }
@@ -1509,6 +1553,82 @@
                 }
             }
 
+            applyLinearAdjustment() {
+                const miscloseData = this.calculateMisclose();
+                
+                // Hide warning by default
+                if (typeof window !== 'undefined' && elements.adjustmentWarning) {
+                    elements.adjustmentWarning.classList.add('hidden');
+                }
+
+                // We can only adjust a run that has a closed misclose
+                if (!miscloseData || miscloseData.type !== 'closed') {
+                    return; 
+                }
+
+                // Check for Figure-8 / Complex Networks to warn the user
+                const fsPoints = this.levelRuns.map(run => run.foresights[run.foresights.length - 1]?.words['11']?.value).filter(Boolean);
+                const isFigure8 = fsPoints.slice(0, -1).includes(miscloseData.startPoint);
+                
+                if (isFigure8 && typeof window !== 'undefined' && elements.adjustmentWarning) {
+                    elements.adjustmentWarning.classList.remove('hidden');
+                }
+
+                const M = miscloseData.misclose; 
+                if (Math.abs(M) < 0.00001) return; // Error is virtually zero, no adjustment needed
+
+                let cumulativeDistance = 0;
+                let cumulativeSetups = 0;
+                const totalSetups = this.levelRuns.length;
+
+                // Pass 1: Calculate total traverse distance
+                let totalTraverseDistance = 0;
+                this.levelRuns.forEach(run => {
+                    const bsDist = run.backsight.words['32']?.value || 0;
+                    const fsDist = run.foresights[run.foresights.length - 1]?.words['32']?.value || 0;
+                    totalTraverseDistance += (bsDist + fsDist);
+                });
+
+                // Pass 2: Calculate and apply corrections
+                this.levelRuns.forEach((run, index) => {
+                    cumulativeSetups += 1;
+                    const bsDist = run.backsight.words['32']?.value || 0;
+                    const fsDist = run.foresights[run.foresights.length - 1]?.words['32']?.value || 0;
+                    cumulativeDistance += (bsDist + fsDist);
+
+                    let correction = 0;
+                    if (this.processingOptions.adjustmentMethod === 'distance' && totalTraverseDistance > 0) {
+                        correction = -M * (cumulativeDistance / totalTraverseDistance);
+                    } else {
+                        correction = -M * (cumulativeSetups / totalSetups);
+                    }
+
+                    // Apply to Foresights
+                    run.foresights.forEach(fs => {
+                        const rec = this.data.find(r => r.lineNumber === fs.lineNumber);
+                        if (rec && rec.calculatedRL !== undefined) {
+                            rec.adjustedRL = rec.calculatedRL + correction;
+                        }
+                    });
+
+                    // Apply to Intermediates (They receive the correction of the setup they are observed from)
+                    run.intermediates.forEach(is => {
+                        const rec = this.data.find(r => r.lineNumber === is.lineNumber);
+                        if (rec && rec.calculatedRL !== undefined) {
+                            rec.adjustedRL = rec.calculatedRL + correction;
+                        }
+                    });
+
+                    // Ensure the first backsight gets a baseline Adjusted RL (zero correction)
+                    if (index === 0) {
+                        const bsRec = this.data.find(r => r.lineNumber === run.backsight.lineNumber);
+                        if (bsRec && bsRec.calculatedRL !== undefined) {
+                            bsRec.adjustedRL = bsRec.calculatedRL;
+                        }
+                    }
+                });
+            }
+            
             analyzePointRepeatability() {
                 const pointData = new Map();
 
@@ -2070,6 +2190,9 @@
             applySpinner: document.getElementById('applySpinner'),
             benchmarkPoint: document.getElementById('benchmarkPoint'),
             benchmarkValue: document.getElementById('benchmarkValue'),
+            applyAdjustment: document.getElementById('applyAdjustment'),
+            adjustmentSettings: document.getElementById('adjustmentSettings'),
+            adjustmentWarning: document.getElementById('adjustmentWarning'),
 
             // TPS Advanced Options Form
             applyTpsText: document.getElementById('applyTpsText'),
@@ -2257,6 +2380,10 @@
                     elements.fileInput.click();
                 }
             });
+
+        elements.applyAdjustment.addEventListener('change', (e) => {
+                elements.adjustmentSettings.style.display = e.target.checked ? 'block' : 'none';
+            });
         }
 
         
@@ -2328,7 +2455,9 @@ function hideTpsAdvancedSection() {
                     showCPDetails: elements.showCPDetails.checked,
                     retainCalibrationData: elements.retainCalibration.checked,
                     benchmarkPoint: elements.benchmarkPoint.value,
-                    benchmarkValue: elements.benchmarkValue.value ? parseFloat(elements.benchmarkValue.value) : null
+                    benchmarkValue: elements.benchmarkValue.value ? parseFloat(elements.benchmarkValue.value) : null,
+                    applyAdjustment: elements.applyAdjustment.checked,
+                    adjustmentMethod: document.querySelector('input[name="adjustmentMethod"]:checked').value,
                 };
                 
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -2479,7 +2608,7 @@ function hideTpsAdvancedSection() {
             if (dataToDisplay.length === 0) {
                 const row = elements.dataTable.insertRow();
                 const cell = row.insertCell();
-                cell.colSpan = 7;
+                cell.colSpan = 8; // <--- Changed from 7 to 8
                 cell.textContent = "No data to display in this view.";
                 cell.style.textAlign = 'center';
             } else {
@@ -2494,6 +2623,10 @@ function hideTpsAdvancedSection() {
                     const height = (record.words['83'] && typeof record.words['83'].value === 'number') ? record.words['83'].value.toFixed(4) : '';
                     const setup = record.setupNumber || '';
                     const calculatedRL = (record.calculatedRL !== undefined && typeof record.calculatedRL === 'number') ? record.calculatedRL.toFixed(4) : '';
+                    
+                    // NEW: Grab the adjusted RL
+                    const adjustedRL = (record.adjustedRL !== undefined && typeof record.adjustedRL === 'number') ? record.adjustedRL.toFixed(4) : '';
+
                     row.innerHTML = `
                         <td>${escapeHtml(point)}</td>
                         <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
@@ -2501,6 +2634,7 @@ function hideTpsAdvancedSection() {
                         <td class="numeric">${escapeHtml(distance)}</td>
                         <td class="numeric">${escapeHtml(height)}</td>
                         <td class="numeric"><span class="calculated-rl">${calculatedRL}</span></td>
+                        <td class="numeric"><span class="calculated-rl" style="color: var(--primary); font-weight: bold;">${adjustedRL}</span></td>
                         <td class="numeric">${escapeHtml(String(setup))}</td>
                     `;
                     elements.dataTable.appendChild(row);
