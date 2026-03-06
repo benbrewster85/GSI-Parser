@@ -269,19 +269,6 @@
                             </p>
                         </div>
                     </div>
-
-                    <div class="advanced-group">
-                        <h4>Benchmark Settings</h4>
-                        <p class="help-text">Set an arbitrary starting level or assign a known elevation to a specific point.</p>
-                        
-                        <label class="form-label" for="benchmarkPoint">Select Benchmark Point:</label>
-                        <select id="benchmarkPoint" class="form-input" style="margin-bottom: 15px;">
-                            <option value="">-- Auto-detect (WI 83) or Default (10.000m) --</option>
-                        </select>
-                        
-                        <label class="form-label" for="benchmarkValue">Known Elevation (m):</label>
-                        <input type="number" id="benchmarkValue" class="form-input" step="0.001" placeholder="e.g., 100.000">
-                    </div>
                     
                     <div class="advanced-group">
                         <h4>Output Options</h4>
@@ -442,11 +429,8 @@
                     includeTurnCount: false,
                     showCPDetails: false,
                     retainCalibrationData: false,
-                    tpsExportMode: 'meaned',
-                    benchmarkPoint: '',
-                    benchmarkValue: null
+                    tpsExportMode: 'meaned'
                 };
-                
             }
 
             parse(text) {
@@ -1558,53 +1542,40 @@
             }
 
             calculateReducedLevels() {
-                // STEP 1: Establish the baseline (Auto-detect or Dummy Value)
-                const knownLevels = {};
-                let startPointId = null;
-                let startElevation = 10.000; // Default dummy value
-                
+                // Find the first point with a known height to start the calculation.
                 const firstBenchmark = this.data.find(rec => rec.words['83']);
-                const firstBacksight = this.levelRuns.length > 0 ? this.levelRuns[0].backsight.words['11']?.value : null;
-
-                if (firstBenchmark) {
-                    startPointId = firstBenchmark.words['11'].value;
-                    startElevation = firstBenchmark.words['83'].value;
-                } else if (firstBacksight) {
-                    startPointId = firstBacksight;
-                } else {
-                    console.warn("No starting point found. Cannot calculate levels.");
-                    return; 
+                if (!firstBenchmark) {
+                    console.warn("No starting elevation (WI 83) found. Cannot calculate reduced levels.");
+                    return; // Exit if no starting point
                 }
 
-                knownLevels[startPointId] = startElevation;
+                const knownLevels = {};
+                const startPointId = firstBenchmark.words['11'].value;
+                knownLevels[startPointId] = firstBenchmark.words['83'].value;
+
+                // Use a map for efficient lookup and modification of the original records
                 const recordMap = new Map(this.data.map(rec => [rec.lineNumber, rec]));
 
-                // Assign the baseline elevation to the baseline record's Calculated RL 
-                if (firstBenchmark) {
-                    const originalRec = recordMap.get(firstBenchmark.lineNumber);
-                    if (originalRec) originalRec.calculatedRL = startElevation;
-                }
-
-                // Calculate relative differentials
+                // Iterate through the raw, non-aggregated runs of the current dataset
                 for (const run of this.levelRuns) {
                     const bsRecord = run.backsight;
                     const bsPointId = bsRecord.words['11']?.value;
 
+                    // A setup must have a backsight to a point with a known level
                     if (!bsPointId || typeof knownLevels[bsPointId] === 'undefined') {
-                        continue; 
-                    }
-                    
-                    // Assign the known elevation to the backsight's Calculated RL
-                    const originalBsRecord = recordMap.get(bsRecord.lineNumber);
-                    if (originalBsRecord) {
-                        originalBsRecord.calculatedRL = knownLevels[bsPointId];
+                        console.warn(`Skipping setup ${run.setupNumber}: Backsight point "${bsPointId}" has no known level.`);
+                        continue; // Can't calculate this setup, move to the next
                     }
                     
                     const bsReading = bsRecord.words['331']?.value;
-                    if (typeof bsReading !== 'number') continue;
+                    if (typeof bsReading !== 'number') {
+                        console.warn(`Skipping setup ${run.setupNumber}: No valid backsight reading.`);
+                        continue;
+                    }
 
                     const heightOfCollimation = knownLevels[bsPointId] + bsReading;
 
+                    // Process Intermediate Sights
                     run.intermediates.forEach(isRecord => {
                         const isPointId = isRecord.words['11']?.value;
                         const isReading = isRecord.words['333']?.value;
@@ -1612,9 +1583,11 @@
                             const calculatedRL = heightOfCollimation - isReading;
                             const originalRecord = recordMap.get(isRecord.lineNumber);
                             if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Intermediate sights do not establish new known points, so we don't add them to knownLevels
                         }
                     });
 
+                    // Process Foresights
                     run.foresights.forEach(fsRecord => {
                         const fsPointId = fsRecord.words['11']?.value;
                         const fsReading = fsRecord.words['332']?.value;
@@ -1622,36 +1595,10 @@
                             const calculatedRL = heightOfCollimation - fsReading;
                             const originalRecord = recordMap.get(fsRecord.lineNumber);
                             if (originalRecord) originalRecord.calculatedRL = calculatedRL;
+                            // Add this new foresight level to our list of known levels for subsequent setups
                             knownLevels[fsPointId] = calculatedRL;
                         }
                     });
-                }
-
-                // STEP 2: The Offset Calculation
-                if (this.processingOptions.benchmarkPoint && this.processingOptions.benchmarkValue !== null) {
-                    const targetPoint = this.processingOptions.benchmarkPoint;
-                    const targetVal = this.processingOptions.benchmarkValue;
-                    
-                    let currentVal = undefined;
-                    
-                    // Check known levels (catches the start point) or calculated records
-                    if (knownLevels[targetPoint] !== undefined) {
-                        currentVal = knownLevels[targetPoint];
-                    } else {
-                        const targetRecord = this.data.find(r => r.words['11']?.value === targetPoint && r.calculatedRL !== undefined);
-                        if (targetRecord) currentVal = targetRecord.calculatedRL;
-                    }
-
-                    if (currentVal !== undefined) {
-                        const offset = targetVal - currentVal;
-
-                        // Apply the global shift ONLY to the calculated results
-                        this.data.forEach(rec => {
-                            if (rec.calculatedRL !== undefined) {
-                                rec.calculatedRL += offset;
-                            }
-                        });
-                    }
                 }
             }
 
@@ -1828,49 +1775,6 @@
                         });
                     });
                 }
-
-                // === NEW: Averaged Elevations Dump ===
-                output += '\n# --------------------------------------------------------\n';
-                output += '# Averaged Calculated Elevations\n';
-                output += '# Useful for fixing elevations in a separate traverse adjustment\n';
-                output += '# --------------------------------------------------------\n';
-                output += '.dataOff\n\n';
-
-                const pointElevations = new Map();
-                
-                // Collect every calculated RL for every point
-                this.data.forEach(rec => {
-                    const pointId = rec.words['11']?.value;
-                    const rl = rec.calculatedRL;
-                    
-                    // Skip change points if aggregation is on, to keep the export clean
-                    if (this.processingOptions.aggregateCP && this.isChangePoint(pointId)) {
-                        return;
-                    }
-
-                    if (pointId && rl !== undefined) {
-                        if (!pointElevations.has(pointId)) {
-                            pointElevations.set(pointId, []);
-                        }
-                        pointElevations.get(pointId).push(rl);
-                    }
-                });
-
-                // Sort the points alphabetically/numerically for a neat output
-                const sortedPoints = Array.from(pointElevations.keys()).sort((a, b) => 
-                    a.localeCompare(b, undefined, { numeric: true })
-                );
-
-                // Calculate the average and format the StarNet string
-                sortedPoints.forEach(pointId => {
-                    const rls = pointElevations.get(pointId);
-                    const avgRL = rls.reduce((a, b) => a + b, 0) / rls.length;
-                    
-                    // Format: E PointID Elevation !
-                    output += `E ${pointId.padEnd(14)} ${avgRL.toFixed(4)} !\n`;
-                });
-                output += '\n';
-                // =====================================
                 
                 output += '# End of level data\n';
                 return output;
@@ -2068,8 +1972,6 @@
             numericMax: document.getElementById('numericMax'),
             applyText: document.getElementById('applyText'),
             applySpinner: document.getElementById('applySpinner'),
-            benchmarkPoint: document.getElementById('benchmarkPoint'),
-            benchmarkValue: document.getElementById('benchmarkValue'),
 
             // TPS Advanced Options Form
             applyTpsText: document.getElementById('applyTpsText'),
@@ -2326,9 +2228,7 @@ function hideTpsAdvancedSection() {
                     numericMax: parseInt(elements.numericMax.value) || 999,
                     includeTurnCount: elements.includeTurnCount.checked,
                     showCPDetails: elements.showCPDetails.checked,
-                    retainCalibrationData: elements.retainCalibration.checked,
-                    benchmarkPoint: elements.benchmarkPoint.value,
-                    benchmarkValue: elements.benchmarkValue.value ? parseFloat(elements.benchmarkValue.value) : null
+                    retainCalibrationData: elements.retainCalibration.checked
                 };
                 
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -2500,7 +2400,7 @@ function hideTpsAdvancedSection() {
                         <td class="numeric">${escapeHtml(reading)}</td>
                         <td class="numeric">${escapeHtml(distance)}</td>
                         <td class="numeric">${escapeHtml(height)}</td>
-                        <td class="numeric"><span class="calculated-rl">${calculatedRL}</span></td>
+                        <td class="numeric"><span class="calculated-rl">${(type === 'foresight' || type === 'intermediate') ? calculatedRL : ''}</span></td>
                         <td class="numeric">${escapeHtml(String(setup))}</td>
                     `;
                     elements.dataTable.appendChild(row);
@@ -2525,39 +2425,6 @@ function hideTpsAdvancedSection() {
                 elements.analysisSection.classList.remove('hidden');
             } else {
                 elements.analysisSection.classList.add('hidden');
-            }
-            populateBenchmarkDropdown();
-        }
-
-        function populateBenchmarkDropdown() {
-            if (!elements.benchmarkPoint || !parser) return;
-            
-            const currentValue = elements.benchmarkPoint.value; 
-            elements.benchmarkPoint.innerHTML = '<option value="">-- Auto-detect (WI 83) or Default (10.000m) --</option>';
-            
-            const validPoints = new Set();
-            
-            if (parser.levelRuns && parser.levelRuns.length > 0 && parser.levelRuns[0].backsight) {
-                validPoints.add(parser.levelRuns[0].backsight.words['11']?.value);
-            }
-            
-            parser.data.forEach(r => {
-                if (r.calculatedRL !== undefined && r.words['11']) {
-                    validPoints.add(r.words['11'].value);
-                }
-            });
-
-            Array.from(validPoints).filter(Boolean).forEach(pt => {
-                if (elements.aggregateCP.checked && parser.isChangePoint(pt)) return;
-
-                const option = document.createElement('option');
-                option.value = pt;
-                option.textContent = pt;
-                elements.benchmarkPoint.appendChild(option);
-            });
-            
-            if (currentValue && validPoints.has(currentValue)) {
-                elements.benchmarkPoint.value = currentValue;
             }
         }
 
