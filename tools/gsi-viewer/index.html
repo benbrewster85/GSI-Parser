@@ -1556,30 +1556,60 @@
             applyLinearAdjustment() {
                 const miscloseData = this.calculateMisclose();
                 
-                // Hide warning by default
+                // Reset the warning box
                 if (typeof window !== 'undefined' && elements.adjustmentWarning) {
                     elements.adjustmentWarning.classList.add('hidden');
+                    elements.adjustmentWarning.innerHTML = '';
                 }
 
-                // We can only adjust a run that has a closed misclose
+                // WARNING 1: Open Run / Cannot Adjust
                 if (!miscloseData || miscloseData.type !== 'closed') {
+                    if (typeof window !== 'undefined' && elements.adjustmentWarning) {
+                        elements.adjustmentWarning.innerHTML = '<strong>⚠️ Cannot Adjust Open Run</strong><br>This level run does not close onto its starting point or a known independent benchmark. Linear adjustment requires a mathematically closed loop or link traverse.';
+                        elements.adjustmentWarning.classList.remove('hidden');
+                    }
                     return; 
                 }
 
-                // Check for Figure-8 / Complex Networks to warn the user
+                const M = miscloseData.misclose; 
+                let warningHTML = '';
+
+                // WARNING 2: Check for Figure-8 / Complex Networks
                 const fsPoints = this.levelRuns.map(run => run.foresights[run.foresights.length - 1]?.words['11']?.value).filter(Boolean);
                 const isFigure8 = fsPoints.slice(0, -1).includes(miscloseData.startPoint);
                 
-                if (isFigure8 && typeof window !== 'undefined' && elements.adjustmentWarning) {
-                    elements.adjustmentWarning.classList.remove('hidden');
+                if (isFigure8) {
+                    warningHTML += '<strong>⚠️ Complex Network Detected</strong><br>This run crosses itself (figure-8). Linear adjustment will force closure but may yield conflicting elevations at junction points. Rigorous least-squares is recommended.<br><br>';
                 }
 
-                const M = miscloseData.misclose; 
-                if (Math.abs(M) < 0.00001) return; // Error is virtually zero, no adjustment needed
+                // WARNING 3: Zero Misclose / Suspicious Closure Prompt
+                if (Math.abs(M) < 0.00001) {
+                    warningHTML += '<strong>⚠️ Zero Misclose / Unresolved Error</strong><br>The calculated misclose is exactly 0.0 mm. In field surveying, a perfect zero is extremely rare. Please check your raw data for point naming typos (e.g. Start and End points having slightly different names) to ensure the loop closed correctly.';
+                    
+                    if (typeof window !== 'undefined' && elements.adjustmentWarning) {
+                        elements.adjustmentWarning.innerHTML = warningHTML;
+                        elements.adjustmentWarning.classList.remove('hidden');
+                    }
+
+                    // Populate adjustedRL anyway so reports/CSV tables don't have blank columns
+                    this.data.forEach(rec => {
+                        if (rec.calculatedRL !== undefined) {
+                            rec.adjustedRL = rec.calculatedRL;
+                        }
+                    });
+                    return; // Abort further adjustment math
+                }
+
+                // Display any accumulated warnings
+                if (warningHTML !== '' && typeof window !== 'undefined' && elements.adjustmentWarning) {
+                    elements.adjustmentWarning.innerHTML = warningHTML;
+                    elements.adjustmentWarning.classList.remove('hidden');
+                }
 
                 let cumulativeDistance = 0;
                 let cumulativeSetups = 0;
                 const totalSetups = this.levelRuns.length;
+                
 
                 // Pass 1: Calculate total traverse distance
                 let totalTraverseDistance = 0;
@@ -1882,6 +1912,50 @@
                         report += 'Misclose can only be calculated for runs between two known benchmarks.\n';
                     }
                 }
+
+                // === NEW: Linear Adjustment Summary ===
+                if (this.processingOptions.applyAdjustment) {
+                    const miscloseData = this.calculateMisclose();
+                    
+                    if (miscloseData && miscloseData.type === 'closed') {
+                        report += '\n\nLINEAR ADJUSTMENT SUMMARY\n';
+                        report += '========================\n';
+                        report += `Method Applied: ${this.processingOptions.adjustmentMethod === 'distance' ? 'By Distance Leveled' : 'By Setup Count (Turns)'}\n`;
+                        report += `Total Misclose Distributed: ${(miscloseData.misclose * 1000).toFixed(1)} mm\n`;
+                        report += '------------------------\n';
+                        report += 'FINAL ADJUSTED ELEVATIONS:\n';
+                        
+                        // Collect the final adjusted RL for each unique point
+                        const finalElevations = new Map();
+                        this.data.forEach(rec => {
+                            const pt = rec.words['11']?.value;
+                            if (pt && rec.adjustedRL !== undefined) {
+                                // Overwrite keeps the most recent adjusted value, 
+                                // which perfectly handles intermediate sights and closing loops
+                                finalElevations.set(pt, rec.adjustedRL); 
+                            }
+                        });
+
+                        // Sort and print the adjusted coordinates
+                        const sortedPts = Array.from(finalElevations.keys()).sort((a, b) => 
+                            a.localeCompare(b, undefined, { numeric: true })
+                        );
+                        
+                        sortedPts.forEach(pt => {
+                            report += `  ${pt.padEnd(15)} : ${finalElevations.get(pt).toFixed(4)} m\n`;
+                        });
+                        
+                        // Check for complex networks to append the warning to the report
+                        const fsPoints = this.levelRuns.map(run => run.foresights[run.foresights.length - 1]?.words['11']?.value).filter(Boolean);
+                        const isFigure8 = fsPoints.slice(0, -1).includes(miscloseData.startPoint);
+                        if (isFigure8) {
+                            report += '\n⚠️ WARNING: Complex Network (Figure-8) Detected.\n';
+                            report += 'Linear adjustment forces mathematical closure at the end point,\n';
+                            report += 'but intermediate junction points may not be rigorously resolved.\n';
+                            report += 'A Least-Squares adjustment is recommended for this dataset.\n';
+                        }
+                    }
+                }
                 
                 return report;
             }
@@ -1997,20 +2071,44 @@
             }
 
             exportCSV() {
-                let csv = 'Point,Type,Reading,Distance,Height,CalculatedRL,Setup,Line\n';
-                this.data.forEach(record => {
-                    const point = record.words['11']?.value || '';
-                    const type = record.type;
-                    const reading = ['331', '332', '333', '330'].map(wi => record.words[wi]?.value).find(Boolean) || '';
-                    const dist = record.words['32']?.value || '';
-                    const hgt = record.words['83']?.value || '';
-                    const calcRL = (type === 'foresight' || type === 'intermediate') && record.calculatedRL !== undefined ? record.calculatedRL : '';
-                    const setup = record.setupNumber || '';
-                    const line = record.lineNumber;
+                if (this.fileType === 'TPS') {
+                    // Keep your existing TPS CSV logic intact
+                    let output = 'Point,Type,Hz,V,SlopeDist,Setup,TargetHeight\n';
+                    this.data.forEach(record => {
+                        const point = record.words['11'] ? record.words['11'].value : '';
+                        const type = record.type || '';
+                        const hz = record.words['21'] ? record.words['21'].value : '';
+                        const v = record.words['22'] ? record.words['22'].value : '';
+                        const sd = record.words['31'] ? record.words['31'].value : '';
+                        const setup = record.setupNumber || '';
+                        const th = record.words['87'] ? record.words['87'].value : '';
+                        output += `"${point}","${type}","${hz}","${v}","${sd}","${setup}","${th}"\n`;
+                    });
+                    return output;
+                } else if (this.fileType === 'Levelling') {
+                    // Updated Leveling CSV logic
+                    let output = 'Point,Type,Reading,Distance,Raw_Height,Calculated_RL,Adjusted_RL,Setup\n';
                     
-                    csv += `"${point}","${type}","${reading}","${dist}","${hgt}","${calcRL}","${setup}","${line}"\n`;
-                });
-                return csv;
+                    this.data.forEach(record => {
+                        const point = record.words['11'] ? record.words['11'].value : '';
+                        const type = record.type || '';
+                        let reading = '';
+                        const readingWord = ['331', '332', '333', '330'].map(wi => record.words[wi]).find(wordObj => wordObj && typeof wordObj.value === 'number');
+                        if (readingWord) reading = readingWord.value.toFixed(5);
+                        
+                        const distance = (record.words['32'] && typeof record.words['32'].value === 'number') ? record.words['32'].value.toFixed(3) : '';
+                        const height = (record.words['83'] && typeof record.words['83'].value === 'number') ? record.words['83'].value.toFixed(4) : '';
+                        const setup = record.setupNumber || '';
+                        
+                        const calcRL = (record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4) : '';
+                        const adjRL = (record.adjustedRL !== undefined) ? record.adjustedRL.toFixed(4) : '';
+
+                        output += `"${point}","${type}","${reading}","${distance}","${height}","${calcRL}","${adjRL}","${setup}"\n`;
+                    });
+                    
+                    return output;
+                }
+                return '';
             }
 
             exportTpsStarNet() {
