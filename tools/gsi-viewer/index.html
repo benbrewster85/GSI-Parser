@@ -8,6 +8,9 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     
 </head>
 <body>
@@ -148,9 +151,9 @@
 
         <div class="section hidden" id="actionsSection">
             <div class="actions">
-                <button class="btn" id="reportBtn">📄 Report</button>
-                <button class="btn" id="starnetBtn">⭐ StarNet</button>
-                <button class="btn" id="csvBtn">📊 CSV</button>
+                <button class="btn" id="reportBtn">Report</button>
+                <button class="btn" id="starnetBtn">StarNet</button>
+                <button class="btn" id="csvBtn">CSV</button>
                 <button class="btn" id="advancedBtn">⚙️ Advanced</button>
             </div>
         </div>
@@ -158,7 +161,8 @@
 
         <div class="section hidden" id="tpsActionsSection">
     <div class="actions">
-        <button class="btn primary" id="tpsStarnetBtn">⭐ Export StarNet File</button>
+        <button class="btn primary" id="tpsStarnetBtn">Export StarNet File</button>
+        <button class="btn primary" id="tpsPdfBtn">QC PDF Report</button>
         <button class="btn" id="tpsAdvancedBtn">⚙️ Advanced</button>
     </div>
 </div>
@@ -486,6 +490,199 @@
                 };
                 
             }
+
+          exportQCPDF(filename) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape'); 
+    
+    // --- 1. Document Header ---
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("TPS Quality Control Report (Expanded Data)", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const reportDate = new Date().toLocaleString('en-GB');
+    
+    doc.text(`File Name: ${filename}.gsi`, 14, 30);
+    doc.text(`Report Generated: ${reportDate}`, 14, 35);
+    doc.text(`Instrument Setups: ${this.tpsSetups.length}`, 14, 40);
+    doc.text(`Data Cleaning: ${this.processingOptions.tpsExcludeOutliers ? 'Outliers Excluded from Means' : 'Outliers Retained'}`, 14, 45);
+
+    // --- 2. QA Tolerances Summary ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Applied QA Tolerances", 180, 25);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Internal Hz Spread: ${this.qaTolerances.hzSpread}"`, 180, 32);
+    doc.text(`Internal V Spread: ${this.qaTolerances.vaSpread}"`, 180, 37);
+    doc.text(`Internal SD Spread: ${(this.qaTolerances.sdSpread * 1000).toFixed(1)} mm`, 180, 42);
+    doc.text(`Face Comparison Hz Max: ${this.qaTolerances.faceHz}"`, 240, 32);
+    doc.text(`Face Comparison V Max: ${this.qaTolerances.faceVa}"`, 240, 37);
+
+    // --- 3. Build the Observation Table Data ---
+    const tableBody = [];
+    
+    const setups = new Map();
+    this.finalTpsObservations.forEach(obs => {
+        if (!setups.has(obs.atStation)) setups.set(obs.atStation, []);
+        setups.get(obs.atStation).push(obs);
+    });
+
+    for (const [station, observations] of setups.entries()) {
+        const instHt = observations[0]?.instHt?.toFixed(3) || '---';
+
+        // Setup Header Row
+        tableBody.push([{ 
+            content: `Setup Station: ${station} (Inst. Ht: ${instHt}m)`, 
+            colSpan: 8, 
+            styles: { fillColor: [220, 220, 220], fontStyle: 'bold', textColor: [0, 0, 0] },
+            isSummaryRow: true
+        }]);
+
+        observations.forEach(obs => {
+            // --- MAIN TARGET SUMMARY ROW ---
+            const target = obs.toPoint;
+            const flCount = obs.faceData.faceI?.count || 0;
+            const frCount = obs.faceData.faceII?.count || 0;
+            
+            let faceDiffText = 'N/A';
+            let status = 'PASS';
+            let statusColor = [46, 125, 50]; // Green
+            let failReasons = [];
+
+            if (obs.faceData.faceI && (obs.faceData.faceI.qa.spread.status === 'fail' || obs.faceData.faceI.qa.spread.status === 'outlier')) failReasons.push('FL Spread');
+            if (obs.faceData.faceII && (obs.faceData.faceII.qa.spread.status === 'fail' || obs.faceData.faceII.qa.spread.status === 'outlier')) failReasons.push('FR Spread');
+
+            if (obs.faceData.faceI && obs.faceData.faceII) {
+                const faceCheck = obs.faceData.faceI.qa.face;
+                const hzDiff = faceCheck?.values?.hzDiff?.toFixed(1) || '0.0';
+                const vaDiff = faceCheck?.values?.vaDiff?.toFixed(1) || '0.0';
+                const sdDiff = Math.abs(obs.faceData.faceI.meanSd - obs.faceData.faceII.meanSd) * 1000;
+                
+                faceDiffText = `Hz: ${hzDiff}" | V: ${vaDiff}" | SD: ${sdDiff.toFixed(1)}mm`;
+                if (faceCheck?.status === 'fail') failReasons.push('Face Diff');
+            } else {
+                faceDiffText = 'Single Face Only';
+            }
+
+            if (failReasons.length > 0) {
+                status = `FAIL (${failReasons.join(', ')})`;
+                statusColor = [198, 40, 40]; // Red
+            }
+
+            // Push Summary Row (Bold styling)
+            tableBody.push([
+                { content: target, styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: `${flCount} FL / ${frCount} FR`, styles: { fontStyle: 'bold' } , isSummaryRow: true},
+                { content: formatDecimalDegrees(obs.meanHz), styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: formatDecimalDegrees(obs.meanV), styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: obs.meanSd.toFixed(3), styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: obs.targetHeight.toFixed(3), styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: faceDiffText, styles: { fontStyle: 'bold' }, isSummaryRow: true },
+                { content: status, styles: { textColor: statusColor, fontStyle: 'bold' }, isSummaryRow: true }
+            ]);
+
+            // --- RAW DATA SUB-ROWS HELPER ---
+            const addFaceRows = (faceData, faceName) => {
+                if (!faceData) return;
+
+                const hzSpread = faceData.qa.spread.values.hzRange?.toFixed(1) || '0.0';
+                const vSpread = faceData.qa.spread.values.vaRange?.toFixed(1) || '0.0';
+                const sdSpread = ((faceData.qa.spread.values.sdRange || 0) * 1000).toFixed(1);
+                const spreadStatus = faceData.qa.spread.status.toUpperCase();
+                const spreadColor = spreadStatus === 'PASS' ? [100, 100, 100] : [198, 40, 40];
+
+                // Spread Breakdown Sub-Header
+                tableBody.push([{
+                    content: `      ↳ ${faceName} Spreads: Hz ${hzSpread}" | V ${vSpread}" | SD ${sdSpread}mm  [${spreadStatus}]`,
+                    colSpan: 8,
+                    styles: { fillColor: [248, 248, 248], fontStyle: 'italic', textColor: spreadColor, cellPadding: { left: 4, top: 1, bottom: 1 } }
+                }]);
+
+                // Individual Raw Observations
+                faceData.rawObservations.forEach(raw => {
+                    let flags = [];
+                    if (raw.isHzOutlier) flags.push('Hz Outlier!');
+                    if (raw.isVaOutlier) flags.push('V Outlier!');
+                    if (raw.isSdOutlier) flags.push('SD Outlier!');
+                    const flagText = flags.length > 0 ? flags.join(', ') : '';
+
+                    tableBody.push([
+                        { content: `         Obs #${raw.lineNumber}`, styles: { textColor: [120, 120, 120], fontStyle: 'normal' } },
+                        { content: faceName, styles: { textColor: [120, 120, 120], fontStyle: 'normal' } },
+                        { content: formatGsiAngle(raw.words['21']?.data), styles: { textColor: raw.isHzOutlier ? [198, 40, 40] : [120, 120, 120], fontStyle: raw.isHzOutlier ? 'bold' : 'normal' } },
+                        { content: formatGsiAngle(raw.words['22']?.data), styles: { textColor: raw.isVaOutlier ? [198, 40, 40] : [120, 120, 120], fontStyle: raw.isVaOutlier ? 'bold' : 'normal' } },
+                        { content: raw.words['31']?.value?.toFixed(3) || '---', styles: { textColor: raw.isSdOutlier ? [198, 40, 40] : [120, 120, 120], fontStyle: raw.isSdOutlier ? 'bold' : 'normal' } },
+                        { content: '---', styles: { textColor: [150, 150, 150] } }, // No target ht per raw line needed here
+                        { content: '---', styles: { textColor: [150, 150, 150] } }, // No face diff per raw line
+                        { content: flagText, styles: { textColor: [198, 40, 40], fontStyle: 'bold' } }
+                    ]);
+                });
+            };
+
+            addFaceRows(obs.faceData.faceI, 'Face I');
+            addFaceRows(obs.faceData.faceII, 'Face II');
+        });
+    }
+
+    // --- 4. Render the Table ---
+    doc.autoTable({
+        startY: 55,
+        head: [['Target / Line #', 'Observations', 'Hz Angle', 'V Angle', 'Slope Dist (m)', 'Tgt Ht (m)', 'Face Diff / Spreads', 'QC Status']],
+        body: tableBody,
+        theme: 'grid',
+        headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255] },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' },
+            6: { halign: 'left' }
+        },
+        didDrawCell: function (data) {
+            // Check if we are in the body and the cell has our custom flag
+            if (data.row.section === 'body' && data.cell.raw && data.cell.raw.isSummaryRow) {
+                doc.setDrawColor(0, 0, 0); // Solid black
+                doc.setLineWidth(0.6);     // Thicker stroke (default is ~0.1)
+                // Draw a line precisely along the top border of the cell
+                doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+            }
+        },
+        didDrawPage: function (data) {
+            const pageHeight = doc.internal.pageSize.height;
+            const pageWidth = doc.internal.pageSize.width;
+            const marginLeft = data.settings.margin.left;
+            const marginRight = data.settings.margin.right;
+
+            // Set footer styling (small, unobtrusive gray text)
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "italic");
+            doc.setTextColor(130, 130, 130); 
+
+            // Left Side: Page Number
+            const pageStr = 'Page ' + doc.internal.getNumberOfPages();
+            doc.text(pageStr, marginLeft, pageHeight - 10);
+
+            // Right Side: Branding & Copyright
+            const currentYear = new Date().getFullYear();
+            const footerText = `Report generated by the free GSI Parser tool at SurveyTools.co.uk © ${currentYear}`;
+            
+            // Calculate text width to perfectly right-align it
+            const textWidth = doc.getTextWidth(footerText);
+            doc.text(footerText, pageWidth - marginRight - textWidth, pageHeight - 10);
+            
+            // Reset text color back to black just in case it bleeds into the next page generation
+            doc.setTextColor(0, 0, 0); 
+        }
+    });
+
+    // --- 5. Save the PDF ---
+    doc.save(`${filename}_QC_Report.pdf`);
+}
 
             parse(text) {
                 if (text.length > MAX_FILE_SIZE) {
@@ -1342,16 +1539,17 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
 
                         
 // --- QA CHECK 1: Internal Spread Check for each face ---
+// --- QA CHECK 1: Internal Spread Check for each face ---
 [faceI_obs, faceII_obs].forEach((faceGroup, i) => {
     if (faceGroup.length > 1) {
-
+        
+        // Reset any stale outlier flags from previous processing runs
         faceGroup.forEach(obs => {
             obs.isHzOutlier = false;
             obs.isVaOutlier = false;
             obs.isSdOutlier = false;
         });
 
-        
         const faceName = i === 0 ? 'Face I' : 'Face II';
         const checkResult = { status: 'pass', values: {} };
         
@@ -1369,36 +1567,47 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
         const vaRange = (Math.max(...vaDecimals) - Math.min(...vaDecimals)) * 3600; // to seconds
         const sdRange = Math.max(...sdValues) - Math.min(...sdValues);
 
-        // 2. Tolerance Gates: Only run the Q-Test if the spread EXCEEDS our QA tolerances
+        // Track statuses independently
+        let hasOutlier = false;
+        let hasFail = false;
+
+        // 2. Evaluate all three spreads independently
         if (hzRange > this.qaTolerances.hzSpread) {
             const hzOutlier = this.detectAngularOutlier(hzDecimals);
             if (hzOutlier.hasOutlier) {
                 faceGroup[hzOutlier.outlierIndex].isHzOutlier = true;
-                checkResult.status = 'outlier';
+                hasOutlier = true;
             } else {
-                checkResult.status = 'fail'; // Exceeds spread, but no single outlier identified
+                hasFail = true;
             }
         }
 
-        if (vaRange > this.qaTolerances.vaSpread && checkResult.status !== 'outlier') {
+        if (vaRange > this.qaTolerances.vaSpread) {
             const vaOutlier = this.detectAngularOutlier(vaDecimals);
             if (vaOutlier.hasOutlier) {
                 faceGroup[vaOutlier.outlierIndex].isVaOutlier = true;
-                checkResult.status = 'outlier';
+                hasOutlier = true;
             } else {
-                checkResult.status = 'fail';
+                hasFail = true;
             }
         }
 
-        if (sdRange > this.qaTolerances.sdSpread && checkResult.status !== 'outlier') {
+        if (sdRange > this.qaTolerances.sdSpread) {
             const sdOutlier = this.detectLinearOutlier(sdValues);
             if (sdOutlier.hasOutlier) {
                 const originalIndex = sdData[sdOutlier.outlierIndex].index;
                 faceGroup[originalIndex].isSdOutlier = true;
-                checkResult.status = 'outlier';
+                hasOutlier = true;
             } else {
-                checkResult.status = 'fail';
+                hasFail = true;
             }
+        }
+
+        // 3. Assign the final grouped status
+        if (hasOutlier) {
+            checkResult.status = 'outlier';
+        } else if (hasFail) {
+            checkResult.status = 'fail';
         }
 
         checkResult.values = { hzRange, vaRange, sdRange };
@@ -2535,6 +2744,22 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
         currentExtension = 'dat'; // StarNet files often use .dat
         showOutput(parser.exportTpsStarNet(), 'StarNet (TPS)');
     });
+
+    elements.tpsPdfBtn = document.getElementById('tpsPdfBtn'); // Ensure you add this to your 'elements' object mapping
+
+elements.tpsPdfBtn.addEventListener('click', () => {
+    try {
+        parser.exportQCPDF(currentFilename);
+        
+        // Brief UI feedback
+        const originalText = elements.tpsPdfBtn.textContent;
+        elements.tpsPdfBtn.textContent = '✓ Report Generated';
+        setTimeout(() => { elements.tpsPdfBtn.textContent = originalText; }, 2000);
+    } catch (error) {
+        console.error('PDF Generation Error:', error);
+        showStatus('✗ Failed to generate PDF. Check console.', 'error');
+    }
+});
 
     elements.tpsAdvancedBtn.addEventListener('click', toggleTpsAdvancedSection);
 
