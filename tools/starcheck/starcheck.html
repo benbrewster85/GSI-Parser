@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - Star*Check</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                <a href="/resources.html">Resources</a>
+                <a href="/blog/index.html">Blog & News</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+    
+    <div class="container">
+        <div class="local-header">
+            <div class="local-header-container">
+                <h2>Star*Check Pre-Analysis</h2>
+                <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+            </div>
+        </div>
+
+        <div class="section hidden" id="aboutSection">
+            <div class="section-title">
+                ℹ️ About Star*Check
+                <button class="btn" id="aboutToggle">Hide</button>
+            </div>
+            <div class="advanced-content">
+                <p>Upload StarNet (.dat/.txt) files to perform pre-adjustment topological checks, verify coordinate seeds, and run rapid Bowditch (Compass Rule) traverse adjustments to flag gross errors before formal least-squares processing.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="upload-area" id="uploadArea" role="button" tabindex="0">
+                <div style="font-size: 36px; margin-bottom: 10px;">⭐</div>
+                <div>Drop StarNet (.dat/.txt) file here or click to select</div>
+                <input type="file" id="fileInput" class="file-input" accept=".dat,.txt" multiple aria-label="Select StarNet files">
+            </div>
+            <div id="status" class="status hidden" role="alert"></div>
+        </div>
+
+        <div class="section hidden" id="statsSection">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statSetups">0</div>
+                    <div class="stat-label">Occupied Setups</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statObservations">0</div>
+                    <div class="stat-label">Total Observations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statPoints">0</div>
+                    <div class="stat-label">Unique Points</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statHanging">0</div>
+                    <div class="stat-label">Hanging Legs (Spurs)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="networkPlotSection">
+            <div class="section-title">
+                🕸️ Topological Network Map
+                <button class="btn" id="networkToggle">Hide</button>
+            </div>
+            <div class="advanced-content">
+                <p class="help-text" style="margin-bottom: 10px;">
+                    This is a topological force-directed graph. <strong>Squares</strong> are occupied setups; <strong>Dots</strong> are observed targets. Drag nodes to untangle the web. Scroll to zoom.
+                </p>
+                <div id="networkCanvas" style="width: 100%; height: 500px; border: 1px solid var(--border); border-radius: 4px; background-color: var(--bg);"></div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="controlSection">
+            <div class="section-title">
+                📍 Control Coordinates (Fixed Points)
+                <button class="btn" id="controlToggle">Hide</button>
+            </div>
+            <div class="advanced-content">
+                <p class="help-text">Coordinates parsed from 'C' records in the StarNet file. Add or edit points to use as anchors for your traverse.</p>
+                
+                <div class="data-table" style="margin-bottom: 15px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Point ID</th>
+                                <th class="numeric">Easting (E)</th>
+                                <th class="numeric">Northing (N)</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="controlTableBody">
+                            </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                    <div>
+                        <label class="form-label">Point ID</label>
+                        <input type="text" id="newCtrlId" class="form-input" style="width: 120px;">
+                    </div>
+                    <div>
+                        <label class="form-label">Easting</label>
+                        <input type="number" id="newCtrlE" step="0.001" class="form-input" style="width: 140px;">
+                    </div>
+                    <div>
+                        <label class="form-label">Northing</label>
+                        <input type="number" id="newCtrlN" step="0.001" class="form-input" style="width: 140px;">
+                    </div>
+                    <button class="btn" id="addCtrlBtn">➕ Add Control</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="traverseBuilderSection">
+            <div class="section-title">
+                🧭 Traverse Builder & Bowditch Audit
+            </div>
+            <div class="advanced-content">
+                <div class="advanced-grid">
+                    
+                    <div class="advanced-group">
+                        <h4>1. Start Anchor</h4>
+                        <p class="help-text">Select the starting setup. Coordinates will be pulled from the Control Manager.</p>
+                        <label class="form-label" for="travStartStation">Start Station:</label>
+                        <select id="travStartStation" class="form-input" style="margin-bottom: 15px;"></select>
+                        
+                        <div>
+                            <label class="form-label">Starting Azimuth (DDD.MMSS)</label>
+                            <input type="text" id="travStartAzimuth" placeholder="e.g. 45.3000" class="form-input">
+                            <p class="help-text" style="font-size: 11px; margin-top: 4px;">Required to orient the traverse.</p>
+                        </div>
+                    </div>
+
+                    <div class="advanced-group">
+                        <h4>2. Traverse Route</h4>
+                        <p class="help-text">Build your path. If the final station has fixed coordinates, the traverse will automatically close onto it.</p>
+                        
+                        <div id="traverseSequenceList" style="margin-bottom: 15px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; min-height: 80px; font-family: monospace; font-size: 13px;">
+                            <em>Sequence empty. Select a starting station.</em>
+                        </div>
+
+                        <div style="display: flex; gap: 10px;">
+                            <select id="travNextStation" class="form-input"></select>
+                            <button class="btn" id="addTravStationBtn">➕ Add</button>
+                            <button class="btn" id="clearTravBtn">🗑️ Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="advanced-group" style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <button class="btn primary" id="runBowditchBtn" disabled>
+                                <span>Run Bowditch Adjustment</span>
+                            </button>
+                            <span id="resProportional" style="margin-left: 15px; font-weight: bold; color: var(--primary);"></span>
+                        </div>
+                        <button class="btn" id="exportPdfBtn" style="background-color: #10b981; color: white; border-color: #059669; display: none;">
+                            📄 Generate Pre-Check PDF
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="section hidden" id="traverseResultsSection">
+            <div class="section-title">
+                📊 Bowditch Adjustment Results
+            </div>
+            <div class="advanced-content">
+                
+                <div class="stats" style="margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="resAngularMisclose" style="color: var(--primary);">00° 00' 00"</div>
+                        <div class="stat-label">Angular Misclose</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="resLinearMisclose" style="color: var(--primary);">0.000m</div>
+                        <div class="stat-label">Linear Misclose</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="resProportional">1 in 0</div>
+                        <div class="stat-label">Proportional Error</div>
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Station</th>
+                                    <th class="numeric">Distance (m)</th>
+                                    <th class="numeric">Unadj Easting</th>
+                                    <th class="numeric">Unadj Northing</th>
+                                    <th class="numeric" style="color: var(--primary);">Adj Easting</th>
+                                    <th class="numeric" style="color: var(--primary);">Adj Northing</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            © Survey Tools 2026
+        </div>
+    </div>
+    
+    <script src="starcheck.js"></script>
+</body>
+</html>

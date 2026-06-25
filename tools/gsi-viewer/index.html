@@ -74,7 +74,7 @@
                         <p style="margin: 0;">This viewer is optimised for Leica GSI data and supports both GSI-8 and GSI-16 formats. Currently only parsing sets-of-angle (TPS) and Level type data, processing of GNSS and other forms of GSI and survey data are in development.</p><br>
 
                         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
-                            <strong>Version:</strong> 1.0 • <strong>Created by:</strong> B Brewster
+                            <strong>Version:</strong> 1.1 (Mar 26) • <strong>Created by:</strong> B Brewster
                             <br>
                             <strong>Contact:</strong> admin@surveytools.co.uk
                         </div>
@@ -207,6 +207,15 @@
 
                 <label class="form-label" for="qaFaceVa">Face V Difference (arc-seconds)</label>
                 <input type="number" id="qaFaceVa" value="15" class="form-input" style="margin-bottom: 10px;">
+
+                <h4>Data Cleaning</h4>
+<p class="help-text">Automatically handle statistical outliers detected by the Q-Test.</p>
+<div style="margin-bottom: 15px;">
+    <label class="checkbox-label">
+        <input type="checkbox" id="tpsExcludeOutliers">
+        <span>Exclude flagged outliers from calculated means</span>
+    </label>
+</div>
 
                 <button class="btn primary" id="applyTpsAdvanced" style="margin-top: 25px;">
                     <span id="applyTpsText">Apply & Reprocess</span>
@@ -423,7 +432,7 @@
         </div>
 
         <div class="footer">
-            © Survey Tools 2025
+            © Survey Tools 2026
         </div>
     </div>
 
@@ -469,6 +478,7 @@
                     showCPDetails: false,
                     retainCalibrationData: false,
                     tpsExportMode: 'meaned',
+                    tpsExcludeOutliers: false,
                     benchmarkPoint: '',
                     benchmarkValue: null,
                     applyAdjustment: false,
@@ -1234,6 +1244,72 @@
                 return avgDeg;
             }
 
+            // Helper function to detect a single outlier using Dixon's Q-Test
+detectAngularOutlier(anglesInDecimals, confidenceThreshold = 0.829) {
+    if (anglesInDecimals.length < 3) return { hasOutlier: false };
+
+    // 1. Normalise angles relative to the first observation
+    const baseAngle = anglesInDecimals[0];
+    let normalised = anglesInDecimals.map((a, index) => {
+        let diff = (a - baseAngle) * 3600; // Convert to seconds
+        if (diff > 180 * 3600) diff -= 360 * 3600;
+        if (diff < -180 * 3600) diff += 360 * 3600;
+        return { index: index, value: diff };
+    });
+
+    // 2. Sort the normalised differences
+    normalised.sort((a, b) => a.value - b.value);
+
+    const n = normalised.length;
+    const range = normalised[n - 1].value - normalised[0].value;
+
+    // Avoid division by zero if all readings are perfectly identical
+    if (range === 0) return { hasOutlier: false };
+
+    // 3. Test highest and lowest values
+    const qHigh = (normalised[n - 1].value - normalised[n - 2].value) / range;
+    const qLow = (normalised[1].value - normalised[0].value) / range;
+
+    if (qHigh > confidenceThreshold) {
+        return { hasOutlier: true, outlierIndex: normalised[n - 1].index };
+    }
+    if (qLow > confidenceThreshold) {
+        return { hasOutlier: true, outlierIndex: normalised[0].index };
+    }
+
+    return { hasOutlier: false };
+}
+
+// Helper function to detect a single outlier in linear data (e.g., Slope Distances)
+detectLinearOutlier(values, confidenceThreshold = 0.829) {
+    if (values.length < 3) return { hasOutlier: false };
+
+    // Map to keep track of original array indices before sorting
+    let mapped = values.map((v, index) => ({ index: index, value: v }));
+
+    // Sort by value
+    mapped.sort((a, b) => a.value - b.value);
+
+    const n = mapped.length;
+    const range = mapped[n - 1].value - mapped[0].value;
+
+    // Avoid division by zero if all readings are perfectly identical
+    if (range === 0) return { hasOutlier: false };
+
+    // Test highest and lowest values
+    const qHigh = (mapped[n - 1].value - mapped[n - 2].value) / range;
+    const qLow = (mapped[1].value - mapped[0].value) / range;
+
+    if (qHigh > confidenceThreshold) {
+        return { hasOutlier: true, outlierIndex: mapped[n - 1].index };
+    }
+    if (qLow > confidenceThreshold) {
+        return { hasOutlier: true, outlierIndex: mapped[0].index };
+    }
+
+    return { hasOutlier: false };
+}
+
             reduceTpsSetups() {
                 this.reducedTpsSetups = this.tpsSetups.map((setup, index, allSetups) => {
                     const observationsByPoint = new Map();
@@ -1251,11 +1327,12 @@
                         if (observations.length === 0) continue;
 
                         const obsWithFace = observations.map(obs => {
-                            const vaStr = obs.words['22']?.data;
-                            const vaDecimal = vaStr ? gsiAngleToDecimal(vaStr) : 0;
-                            const face = (vaDecimal > 180 && vaDecimal < 360) ? 'Face II' : 'Face I';
-                            return { ...obs, face, vaDecimal };
-                        });
+    const vaStr = obs.words['22']?.data;
+    // Mutate the original object directly instead of creating a copy
+    obs.vaDecimal = vaStr ? gsiAngleToDecimal(vaStr) : 0;
+    obs.face = (obs.vaDecimal > 180 && obs.vaDecimal < 360) ? 'Face II' : 'Face I';
+    return obs; 
+});
 
                         const faceI_obs = obsWithFace.filter(o => o.face === 'Face I');
                         const faceII_obs = obsWithFace.filter(o => o.face === 'Face II');
@@ -1263,28 +1340,71 @@
                         let faceICheck = { status: 'N/A', values: {} };
                         let faceIICheck = { status: 'N/A', values: {} };
 
-                        // --- QA CHECK 1: Internal Spread Check for each face ---
-                        [faceI_obs, faceII_obs].forEach((faceGroup, i) => {
-                            if (faceGroup.length > 1) {
-                                const faceName = i === 0 ? 'Face I' : 'Face II';
-                                const checkResult = { status: 'pass', values: {} };
-                                
-                                const hzDecimals = faceGroup.map(o => gsiAngleToDecimal(o.words['21'].data));
-                                const vaDecimals = faceGroup.map(o => o.vaDecimal);
-                                const sdValues = faceGroup.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+                        
+// --- QA CHECK 1: Internal Spread Check for each face ---
+[faceI_obs, faceII_obs].forEach((faceGroup, i) => {
+    if (faceGroup.length > 1) {
 
-                                const hzRange = (Math.max(...hzDecimals) - Math.min(...hzDecimals)) * 3600; // to seconds
-                                const vaRange = (Math.max(...vaDecimals) - Math.min(...vaDecimals)) * 3600; // to seconds
-                                const sdRange = Math.max(...sdValues) - Math.min(...sdValues);
+        faceGroup.forEach(obs => {
+            obs.isHzOutlier = false;
+            obs.isVaOutlier = false;
+            obs.isSdOutlier = false;
+        });
 
-                                if (hzRange > this.qaTolerances.hzSpread) checkResult.status = 'fail';
-                                if (vaRange > this.qaTolerances.vaSpread) checkResult.status = 'fail';
-                                if (sdRange > this.qaTolerances.sdSpread) checkResult.status = 'fail';
+        
+        const faceName = i === 0 ? 'Face I' : 'Face II';
+        const checkResult = { status: 'pass', values: {} };
+        
+        const hzDecimals = faceGroup.map(o => gsiAngleToDecimal(o.words['21'].data));
+        const vaDecimals = faceGroup.map(o => o.vaDecimal);
+        
+        // Safely extract SDs while retaining their original observation index
+        const sdData = faceGroup
+            .map((o, index) => ({ index: index, value: o.words['31']?.value }))
+            .filter(d => typeof d.value === 'number');
+        const sdValues = sdData.map(d => d.value);
 
-                                checkResult.values = { hzRange, vaRange, sdRange };
-                                if(i === 0) faceICheck = checkResult; else faceIICheck = checkResult;
-                            }
-                        });
+        // 1. Calculate the ranges first
+        const hzRange = (Math.max(...hzDecimals) - Math.min(...hzDecimals)) * 3600; // to seconds
+        const vaRange = (Math.max(...vaDecimals) - Math.min(...vaDecimals)) * 3600; // to seconds
+        const sdRange = Math.max(...sdValues) - Math.min(...sdValues);
+
+        // 2. Tolerance Gates: Only run the Q-Test if the spread EXCEEDS our QA tolerances
+        if (hzRange > this.qaTolerances.hzSpread) {
+            const hzOutlier = this.detectAngularOutlier(hzDecimals);
+            if (hzOutlier.hasOutlier) {
+                faceGroup[hzOutlier.outlierIndex].isHzOutlier = true;
+                checkResult.status = 'outlier';
+            } else {
+                checkResult.status = 'fail'; // Exceeds spread, but no single outlier identified
+            }
+        }
+
+        if (vaRange > this.qaTolerances.vaSpread && checkResult.status !== 'outlier') {
+            const vaOutlier = this.detectAngularOutlier(vaDecimals);
+            if (vaOutlier.hasOutlier) {
+                faceGroup[vaOutlier.outlierIndex].isVaOutlier = true;
+                checkResult.status = 'outlier';
+            } else {
+                checkResult.status = 'fail';
+            }
+        }
+
+        if (sdRange > this.qaTolerances.sdSpread && checkResult.status !== 'outlier') {
+            const sdOutlier = this.detectLinearOutlier(sdValues);
+            if (sdOutlier.hasOutlier) {
+                const originalIndex = sdData[sdOutlier.outlierIndex].index;
+                faceGroup[originalIndex].isSdOutlier = true;
+                checkResult.status = 'outlier';
+            } else {
+                checkResult.status = 'fail';
+            }
+        }
+
+        checkResult.values = { hzRange, vaRange, sdRange };
+        if(i === 0) faceICheck = checkResult; else faceIICheck = checkResult;
+    }
+});
 
 
                         // --- Data Averaging ---
@@ -1373,28 +1493,39 @@
             }
 
             averageObservations(observations) {
-                if (!observations || observations.length === 0) {
-                    return null;
-                }
-                const pointId = observations[0].words['11'].value;
-                const face = observations[0].face;
+    if (!observations || observations.length === 0) {
+        return null;
+    }
 
-                const hzDecimals = observations.map(o => gsiAngleToDecimal(o.words['21'].data));
-                const vDecimals = observations.map(o => o.vaDecimal);
-                const sdValues = observations.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
-                const hrValues = observations.map(o => o.words['87']?.value).filter(v => typeof v === 'number');
+    // Determine which observations to use for the math
+    let workingObs = observations;
+    if (this.processingOptions.tpsExcludeOutliers) {
+        const validObs = observations.filter(o => !o.isHzOutlier && !o.isVaOutlier && !o.isSdOutlier);
+        // Fallback: if all observations were somehow flagged, use them all to prevent crashing
+        workingObs = validObs.length > 0 ? validObs : observations;
+    }
 
-                return {
-                    pointId,
-                    face,
-                    count: observations.length,
-                    meanHz: this.meanAngles(hzDecimals),
-                    meanV: this.meanAngles(vDecimals),
-                    meanSd: sdValues.length > 0 ? sdValues.reduce((a, b) => a + b, 0) / sdValues.length : 0,
-                    targetHeight: hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : 0,
-                    rawObservations: observations
-                };
-            }
+    // Use workingObs for the calculations
+    const pointId = workingObs[0].words['11'].value;
+    const face = workingObs[0].face;
+
+    const hzDecimals = workingObs.map(o => gsiAngleToDecimal(o.words['21'].data));
+    const vDecimals = workingObs.map(o => o.vaDecimal);
+    const sdValues = workingObs.map(o => o.words['31']?.value).filter(v => typeof v === 'number');
+    const hrValues = workingObs.map(o => o.words['87']?.value).filter(v => typeof v === 'number');
+
+    return {
+        pointId,
+        face,
+        count: workingObs.length,
+        originalCount: observations.length, // Good for UI transparency
+        meanHz: this.meanAngles(hzDecimals),
+        meanV: this.meanAngles(vDecimals),
+        meanSd: sdValues.length > 0 ? sdValues.reduce((a, b) => a + b, 0) / sdValues.length : 0,
+        targetHeight: hrValues.length > 0 ? hrValues.reduce((a, b) => a + b, 0) / hrValues.length : 0,
+        rawObservations: observations // Always keep the full original array so the UI still draws the red flags
+    };
+}
 
             isChangePoint(pointId) {
                 if (!pointId) return false;
@@ -2135,52 +2266,88 @@
     };
 
     if (this.processingOptions.tpsExportMode === 'raw') {
-        // --- RAW EXPORT LOGIC ---
-        this.tpsSetups.forEach(setup => {
-            output += `# Instrument Setup at station: ${setup.stationName}\n`;
-            output += `DB ${setup.stationName}\n`;
-            setup.observations.forEach(obs => {
-                const target = obs.words['11']?.value || '???';
-                const hzDMS = gsiAngleToDMS(obs.words['21']?.data);
-                const vDMS = gsiAngleToDMS(obs.words['22']?.data);
-                const sd = obs.words['31']?.value.toFixed(3) || '0.000';
-                const instHt = setup.instrumentHeight.toFixed(4);
-                const tgtHt = obs.words['87']?.value.toFixed(4) || instHt; // Use instHt as fallback
+    // --- RAW EXPORT LOGIC ---
+    this.tpsSetups.forEach(setup => {
+        output += `# Instrument Setup at station: ${setup.stationName}\n`;
+        output += `DB ${setup.stationName}\n`;
+        
+        setup.observations.forEach(obs => {
+            const target = obs.words['11']?.value || '???';
+            const hzDMS = gsiAngleToDMS(obs.words['21']?.data);
+            const vDMS = gsiAngleToDMS(obs.words['22']?.data);
+            const sd = obs.words['31']?.value.toFixed(3) || '0.000';
+            const instHt = setup.instrumentHeight.toFixed(4);
+            const tgtHt = obs.words['87']?.value.toFixed(4) || instHt;
+            
+            // Check if any of the three parameters were flagged by the Q-Test
+            const isOutlier = obs.isHzOutlier || obs.isVaOutlier || obs.isSdOutlier;
+            
+            if (isOutlier) {
+                // Build a specific comment explaining WHY it was hashed out
+                let reasons = [];
+                if (obs.isHzOutlier) reasons.push('Hz');
+                if (obs.isVaOutlier) reasons.push('V');
+                if (obs.isSdOutlier) reasons.push('SD');
+                
+                output += `# OUTLIER DETECTED (${reasons.join(', ')} spread): Uncomment below to include\n`;
+                output += `# DM ${target} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n`;
+            } else {
+                // Standard, active observation
                 output += `DM ${target} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n`;
-            });
-            output += `DE\n\n`;
+            }
         });
+        output += `DE\n\n`;
+    });
+
 
     } else {
-        // --- MEANED EXPORT LOGIC (Existing Logic) ---
-        const setups = new Map();
-        this.finalTpsObservations.forEach(obs => {
-            if (!setups.has(obs.atStation)) {
-                setups.set(obs.atStation, []);
-            }
-            setups.get(obs.atStation).push(obs);
-        });
-
-        for (const [station, observations] of setups.entries()) {
-            output += `# Instrument Setup at station: ${station}\n`;
-            output += `DB ${station}\n\n`;
-            observations.forEach(obs => {
-                const faceICount = obs.faceData.faceI?.count || 0;
-                const faceIICount = obs.faceData.faceII?.count || 0;
-                let comment = `# Mean of ${faceICount + faceIICount} raw observation(s)`;
-                if (faceICount > 0 && faceIICount > 0) comment += ` (${faceICount} FL, ${faceIICount} FR)`;
-                output += `${comment}\n`;
-
-                const hzDMS = decimalToDMS(obs.meanHz);
-                const vDMS = decimalToDMS(obs.meanV);
-                const sd = obs.meanSd.toFixed(3);
-                const instHt = obs.instHt.toFixed(4);
-                const tgtHt = obs.targetHeight.toFixed(4);
-                output += `DM ${obs.toPoint} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n\n`;
-            });
-            output += `DE\n\n`;
+    // --- MEANED EXPORT LOGIC ---
+    const setups = new Map();
+    this.finalTpsObservations.forEach(obs => {
+        if (!setups.has(obs.atStation)) {
+            setups.set(obs.atStation, []);
         }
+        setups.get(obs.atStation).push(obs);
+    });
+
+    for (const [station, observations] of setups.entries()) {
+        output += `# Instrument Setup at station: ${station}\n`;
+        output += `DB ${station}\n\n`;
+        
+        observations.forEach(obs => {
+            // Extract the new and original counts
+            const faceICount = obs.faceData.faceI?.count || 0;
+            const faceIICount = obs.faceData.faceII?.count || 0;
+            const faceIOrig = obs.faceData.faceI?.originalCount || faceICount;
+            const faceIIOrig = obs.faceData.faceII?.originalCount || faceIICount;
+            
+            const totalValid = faceICount + faceIICount;
+            const totalOrig = faceIOrig + faceIIOrig;
+            const excludedCount = totalOrig - totalValid;
+
+            // Build the audit trail comment
+            let comment = `# Mean of ${totalValid} valid observation(s) (${faceICount} FL, ${faceIICount} FR)`;
+            
+            if (this.processingOptions.tpsExcludeOutliers && excludedCount > 0) {
+                comment += `\n# WARNING: ${excludedCount} outlier(s) were excluded from this mean by the Q-Test`;
+            } else if (excludedCount > 0) {
+                // Just in case outliers exist but the user opted NOT to exclude them
+                comment += `\n# NOTE: ${excludedCount} outlier(s) detected in raw data, but included in this mean`;
+            }
+
+            output += `${comment}\n`;
+
+            const hzDMS = decimalToDMS(obs.meanHz);
+            const vDMS = decimalToDMS(obs.meanV);
+            const sd = obs.meanSd.toFixed(3);
+            const instHt = obs.instHt.toFixed(4);
+            const tgtHt = obs.targetHeight.toFixed(4);
+            
+            output += `DM ${obs.toPoint} ${hzDMS} ${sd} ${vDMS} ${instHt}/${tgtHt}\n\n`;
+        });
+        output += `DE\n\n`;
     }
+}
 
     output += `# End of data file\n`;
     return output;
@@ -2196,6 +2363,7 @@
 
         // Update other processing options
         this.processingOptions.tpsExportMode = options.tpsExportMode || 'meaned';
+        this.processingOptions.tpsExcludeOutliers = options.tpsExcludeOutliers || false;
 
         // Re-run the analysis with the new settings
         this.reduceTpsSetups();
@@ -2390,6 +2558,7 @@
         try {
             const newOptions = {
                 tpsExportMode: document.querySelector('input[name="tpsExportMode"]:checked').value,
+                tpsExcludeOutliers: document.getElementById('tpsExcludeOutliers').checked,
                 qaHzSpread: elements.qaHzSpread.value,
                 qaVaSpread: elements.qaVaSpread.value,
                 qaSdSpread: elements.qaSdSpread.value,
@@ -2829,15 +2998,24 @@ function hideTpsAdvancedSection() {
                     dataToDisplay.forEach(obs => {
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td>${escapeHtml(obs.atStation)}</td>
-                            <td><strong>${escapeHtml(obs.words['11']?.value || '')}</strong></td>
-                            <td>${escapeHtml(obs.face || 'N/A')}</td>
-                            <td class="numeric">${formatGsiAngle(obs.words['21']?.data)}</td>
-                            <td class="numeric">${formatGsiAngle(obs.words['22']?.data)}</td>
-                            <td class="numeric">${obs.words['31']?.value?.toFixed(3) || ''}</td>
-                            <td class="numeric">${obs.instHt?.toFixed(3) || ''}</td>
-                            <td class="numeric">${obs.words['87']?.value?.toFixed(3) || ''}</td>
-                        `;
+    <td>${escapeHtml(obs.atStation)}</td>
+    <td><strong>${escapeHtml(obs.words['11']?.value || '')}</strong></td>
+    <td>${escapeHtml(obs.face || 'N/A')}</td>
+    <td class="numeric">
+        ${formatGsiAngle(obs.words['21']?.data)}
+        ${obs.isHzOutlier ? ' <span class="qa-fail" title="Hz Outlier">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${formatGsiAngle(obs.words['22']?.data)}
+        ${obs.isVaOutlier ? ' <span class="qa-fail" title="V Outlier">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${obs.words['31']?.value?.toFixed(3) || ''}
+        ${obs.isSdOutlier ? ' <span class="qa-fail" title="SD Outlier">!</span>' : ''}
+    </td>
+    <td class="numeric">${obs.instHt?.toFixed(3) || ''}</td>
+    <td class="numeric">${obs.words['87']?.value?.toFixed(3) || ''}</td>
+`;
                         elements.tpsDataTable.appendChild(row);
                     });
                 }
@@ -2915,20 +3093,32 @@ function hideTpsAdvancedSection() {
                                     <thead><tr><th style="width: 10%;">Obs #</th><th class="numeric" style="width: 25%;">Raw Hz</th><th class="numeric" style="width: 25%;">Raw V</th><th class="numeric" style="width: 25%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
                                     <tbody>
                                         ${faceI.rawObservations.map(rawObs => `
-                                            <tr>
-                                                <td class="numeric">${rawObs.lineNumber}</td>
-                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
-                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
-                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
-                                                <td></td>
-                                            </tr>`).join('')}
-                                        <tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
-                                            <strong>Spread Check:</strong>
-                                            Hz: ${faceI.qa.spread.values.hzRange?.toFixed(1)}" |
-                                            V: ${faceI.qa.spread.values.vaRange?.toFixed(1)}" |
-                                            SD: ${(faceI.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
-                                            <strong style="float: right;">Status: ${faceI.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
-                                        </td></tr>
+    <tr>
+    <td class="numeric">${rawObs.lineNumber}</td>
+    <td class="numeric">
+        ${formatGsiAngle(rawObs.words['21']?.data)}
+        ${rawObs.isHzOutlier ? ' <span class="qa-fail" title="Hz Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${formatGsiAngle(rawObs.words['22']?.data)}
+        ${rawObs.isVaOutlier ? ' <span class="qa-fail" title="V Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${rawObs.words['31']?.value?.toFixed(3) || ''}
+        ${rawObs.isSdOutlier ? ' <span class="qa-fail" title="SD Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td></td>
+</tr>`).join('')}
+<tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+    <strong>Spread Check:</strong>
+    Hz: ${faceI.qa.spread.values.hzRange?.toFixed(1)}" |
+    V: ${faceI.qa.spread.values.vaRange?.toFixed(1)}" |
+    SD: ${(faceI.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+    <strong style="float: right;">Status: ${
+        faceI.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' :
+        faceI.qa.spread.status === 'outlier' ? '<span class="qa-fail">OUTLIER DETECTED</span>' : 'PASS'
+    }</strong>
+</td></tr>
                                     </tbody>
                                 </table></div></td></tr>`;
                         }
@@ -2949,20 +3139,32 @@ function hideTpsAdvancedSection() {
                                     <thead><tr><th style="width: 10%;">Obs #</th><th class="numeric" style="width: 25%;">Raw Hz</th><th class="numeric" style="width: 25%;">Raw V</th><th class="numeric" style="width: 25%;">Raw SD</th><th style="width: 15%;"></th></tr></thead>
                                     <tbody>
                                         ${faceII.rawObservations.map(rawObs => `
-                                            <tr>
-                                                <td class="numeric">${rawObs.lineNumber}</td>
-                                                <td class="numeric">${formatGsiAngle(rawObs.words['21']?.data)}</td>
-                                                <td class="numeric">${formatGsiAngle(rawObs.words['22']?.data)}</td>
-                                                <td class="numeric">${rawObs.words['31']?.value?.toFixed(3) || ''}</td>
-                                                <td></td>
-                                            </tr>`).join('')}
-                                        <tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
-                                            <strong>Spread Check:</strong>
-                                            Hz: ${faceII.qa.spread.values.hzRange?.toFixed(1)}" |
-                                            V: ${faceII.qa.spread.values.vaRange?.toFixed(1)}" |
-                                            SD: ${(faceII.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
-                                            <strong style="float: right;">Status: ${faceII.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' : 'PASS'}</strong>
-                                        </td></tr>
+   <tr>
+    <td class="numeric">${rawObs.lineNumber}</td>
+    <td class="numeric">
+        ${formatGsiAngle(rawObs.words['21']?.data)}
+        ${rawObs.isHzOutlier ? ' <span class="qa-fail" title="Hz Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${formatGsiAngle(rawObs.words['22']?.data)}
+        ${rawObs.isVaOutlier ? ' <span class="qa-fail" title="V Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td class="numeric">
+        ${rawObs.words['31']?.value?.toFixed(3) || ''}
+        ${rawObs.isSdOutlier ? ' <span class="qa-fail" title="SD Outlier (Dixon\'s Q-Test)">!</span>' : ''}
+    </td>
+    <td></td>
+</tr>`).join('')}
+<tr><td colspan="5" style="border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px;">
+    <strong>Spread Check:</strong>
+    Hz: ${faceII.qa.spread.values.hzRange?.toFixed(1)}" |
+    V: ${faceII.qa.spread.values.vaRange?.toFixed(1)}" |
+    SD: ${(faceII.qa.spread.values.sdRange * 1000)?.toFixed(1)}mm
+    <strong style="float: right;">Status: ${
+        faceII.qa.spread.status === 'fail' ? '<span class="qa-fail">FAIL</span>' :
+        faceII.qa.spread.status === 'outlier' ? '<span class="qa-fail">OUTLIER DETECTED</span>' : 'PASS'
+    }</strong>
+</td></tr>
                                     </tbody>
                                 </table></div></td></tr>`;
                         }
