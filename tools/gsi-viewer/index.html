@@ -308,10 +308,10 @@
 
                     <div class="advanced-group">
                         <h4>Adjustment Settings</h4>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="applyAdjustment">
-                            <span>Apply Linear Adjustment (Beta)</span>
-                        </label>
+                        <label class="checkbox-label" style="opacity: 0.5; cursor: not-allowed;">
+    <input type="checkbox" id="applyAdjustment" disabled>
+    <span style="cursor: not-allowed;">Apply Linear Adjustment (Coming Soon)</span>
+</label>
                         
                         <div id="adjustmentSettings" style="display: none; margin-top: 10px; margin-bottom: 15px; padding-left: 25px; border-left: 2px solid var(--border);">
                             <label class="form-label">Distribution Method:</label>
@@ -370,12 +370,11 @@
                             <tr>
                                 <th>Point</th>
                                 <th>Type</th>
-                                <th>Reading</th>
-                                <th>Distance</th>
-                                <th>Height</th>
-                                <th>Calculated RL</th>
-                                <th>Adjusted RL</th>
-                                <th>Setup</th>
+                                <th class="numeric">Reading</th>
+                                <th class="numeric">Distance</th>
+                                <th class="numeric">Height</th>
+                                <th class="numeric">Calculated RL</th>
+                                <th class="numeric">Setup</th>
                             </tr>
                         </thead>
                         <tbody id="dataTable"></tbody>
@@ -392,12 +391,12 @@
                         <thead>
                             <tr>
                                 <th>Point ID</th>
-                                <th>Count</th>
-                                <th>Min RL (m)</th>
-                                <th>Max RL (m)</th>
-                                <th>Spread (mm)</th>
-                                <th>Average RL (m)</th>
-                                <th>Observed RLs (m)</th>
+                                <th class="numeric">Count</th>
+                                <th class="numeric">Min RL (m)</th>
+                                <th class="numeric">Max RL (m)</th>
+                                <th class="numeric">Spread (mm)</th>
+                                <th class="numeric">Average RL (m)</th>
+                                <th class="numeric">Observed RLs (m)</th>
                             </tr>
                         </thead>
                         <tbody id="analysisTable"></tbody>
@@ -869,16 +868,15 @@ exportLevelingQCPDF(filename) {
             
             const distance = (record.words['32'] && typeof record.words['32'].value === 'number') ? record.words['32'].value.toFixed(3) : '---';
             const calcRL = (record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4) : '---';
-            const adjRL = (record.adjustedRL !== undefined) ? record.adjustedRL.toFixed(4) : '---';
             const setup = record.setupNumber || '---';
 
-            tableBody.push([point, type, reading, distance, calcRL, adjRL, setup]);
+            tableBody.push([point, type, reading, distance, calcRL, setup]);
         });
 
         doc.autoTable({
             ...sharedOptions,
             startY: currentY + 4,
-            head: [['Point ID', 'Observation Type', 'Reading (m)', 'Distance (m)', 'Calculated RL (m)', 'Adjusted RL (m)', 'Setup #']],
+            head: [['Point ID', 'Observation Type', 'Reading (m)', 'Distance (m)', 'Calculated RL (m)', 'Setup #']],
             body: tableBody,
             margin: { left: 14 }
         });
@@ -1360,55 +1358,64 @@ exportLevelingQCPDF(filename) {
             }
 
             analyze2PegTest() {
-    const obs = {};
-    const recordsToCompute = this.calibrationInfo?.records || [];
-    
-    recordsToCompute.forEach(r => {
-        const pt = r.words['11']?.value;
-        const dist = r.words['32']?.value;
+        const obs = {};
+        const recordsToCompute = this.calibrationInfo?.records || [];
         
-        // Map all four structural target keys used in Leica Check & Adjust software
-        let reading = null;
-        if (r.words['331']) reading = r.words['331'].value; // A1 Reading
-        else if (r.words['332']) reading = r.words['332'].value; // B1 Reading
-        else if (r.words['336']) reading = r.words['336'].value; // B2 Reading
-        else if (r.words['335']) reading = r.words['335'].value; // A2 Reading
+        recordsToCompute.forEach(r => {
+            const pt = r.words['11']?.value;
+            const dist = r.words['32']?.value;
+            
+            let reading = null;
+            if (r.words['331']) reading = r.words['331'].value; 
+            else if (r.words['332']) reading = r.words['332'].value; 
+            else if (r.words['336']) reading = r.words['336'].value; 
+            else if (r.words['335']) reading = r.words['335'].value; 
 
-        if (reading !== null && dist !== undefined) {
-            if (r.words['331']) obs.A1 = { reading, dist, pt };
-            if (r.words['332']) obs.B1 = { reading, dist, pt };
-            if (r.words['336']) obs.B2 = { reading, dist, pt };
-            if (r.words['335']) obs.A2 = { reading, dist, pt };
+            if (reading !== null && dist !== undefined) {
+                if (r.words['331']) obs.A1 = { reading, dist, pt };
+                if (r.words['332']) obs.B1 = { reading, dist, pt };
+                if (r.words['336']) obs.B2 = { reading, dist, pt };
+                if (r.words['335']) obs.A2 = { reading, dist, pt };
+            }
+        });
+
+        if (!obs.A1 || !obs.B1 || !obs.B2 || !obs.A2) return null;
+
+        // --- NEW: Dynamic Method Identification Gate ---
+        // Check if Setup 1's distances to Staff A and Staff B are balanced within 1.0m
+        const isMidpointMethod = Math.abs(obs.A1.dist - obs.B1.dist) <= 1.0;
+        const methodName = isMidpointMethod ? "Traditional Midpoint / End Method" : "1/3 & 2/3 (Förstner/Kukkamäki) Method";
+
+        let trueDiff, apparentDiff, error, distDiff;
+
+        if (isMidpointMethod) {
+            // Standard Midpoint / End layout math
+            trueDiff = obs.A1.reading - obs.B1.reading;
+            apparentDiff = obs.A2.reading - obs.B2.reading;
+            error = apparentDiff - trueDiff;
+            distDiff = (obs.A2.dist - obs.A1.dist) - (obs.B2.dist - obs.B1.dist);
+        } else {
+            // 1/3 & 2/3 Kukkamaki/Förstner layout math
+            // Both setups have error; error is isolated by checking the swap symmetry delta
+            trueDiff = obs.A1.reading - obs.B1.reading;
+            apparentDiff = obs.A2.reading - obs.B2.reading;
+            error = trueDiff - apparentDiff;
+            // True geometric distance baseline is the total absolute distance span between staves
+            distDiff = obs.A1.dist + obs.B1.dist; 
         }
-    });
 
-    // Verify all 4 required positions are filled
-    if (!obs.A1 || !obs.B1 || !obs.B2 || !obs.A2) return null;
+        if (Math.abs(distDiff) < 0.1) return null; 
 
-    // --- Leica Calibration Formula Reduction ---
-    // Setup 1 (Midpoint) establishes the True Height Difference (dH_true)
-    const trueDiff = obs.A1.reading - obs.B1.reading;
-    
-    // Setup 2 (Near Staff A) establishes the Apparent Height Difference (dH_apparent)
-    const apparentDiff = obs.A2.reading - obs.B2.reading;
+        const collimationMmPerM = (error * 1000) / distDiff;
+        const collimationSeconds = collimationMmPerM * 206.265; 
 
-    // Collimation error calculation (Apparent difference minus True difference)
-    const error = apparentDiff - trueDiff;
-    
-    // Distance differences delta
-    const distDiff = (obs.A2.dist - obs.A1.dist) - (obs.B2.dist - obs.B1.dist);
-
-    if (Math.abs(distDiff) < 0.1) return null; // Avoid boundary division issues
-
-    const collimationMmPerM = (error * 1000) / distDiff;
-    const collimationSeconds = collimationMmPerM * 206.265; // Convert angle ratio to arcseconds
-
-    return {
-        A1: obs.A1, B1: obs.B1, B2: obs.B2, A2: obs.A2,
-        trueDiff, apparentDiff, error, distDiff,
-        collimationMmPerM, collimationSeconds
-    };
-}
+        return {
+            A1: obs.A1, B1: obs.B1, B2: obs.B2, A2: obs.A2,
+            trueDiff, apparentDiff, error, distDiff,
+            collimationMmPerM, collimationSeconds,
+            methodName // <--- Return the identified text remark
+        };
+    }
 
             buildLevelRuns(dataToProcess) {
                 const runs = [];
@@ -1896,7 +1903,6 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                 let totalBS = 0;
                 let totalFS = 0;
 
-                // Use the raw, non-aggregated runs for the purest calculation of sums
                 this.levelRuns.forEach(run => {
                     if (run.backsight && run.backsight.words['331']) {
                         totalBS += run.backsight.words['331'].value;
@@ -1909,11 +1915,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                 });
 
                 const measuredDiff = totalBS - totalFS;
-
-                // Find the first record in the main data with a height - this is our start point
                 const firstRecordWithHeight = this.data.find(r => r.words['83']);
-                
-                // Find the last foresight record in the main data
                 const lastForesightRecord = this.levelRuns[this.levelRuns.length - 1]?.foresights.slice(-1)[0];
 
                 if (!firstRecordWithHeight || !lastForesightRecord) {
@@ -1922,13 +1924,38 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
 
                 const startRL = firstRecordWithHeight.words['83'].value;
                 const startPointName = firstRecordWithHeight.words['11']?.value || 'Start';
-                
-                // Check if the final foresight point also has a known height in the original data
                 const endPointName = lastForesightRecord.words['11']?.value;
-                const lastPointRecordWithHeight = this.data.find(r => r.words['11']?.value === endPointName && r.words['83'] && r.lineNumber !== firstRecordWithHeight.lineNumber);
+                
+                // --- THE FIX: Determine if the run loops back onto itself ---
+                const isLoop = (startPointName === endPointName);
+                
+                // Only look for a known end height in the raw data if it's NOT a loop
+                const lastPointRecordWithHeight = this.data.find(r => 
+                    r.words['11']?.value === endPointName && 
+                    r.words['83'] && 
+                    r.lineNumber !== firstRecordWithHeight.lineNumber
+                );
 
-                if (lastPointRecordWithHeight) {
-                    // This is a closed run between two known points
+                if (isLoop) {
+                    // Closed loop back to the starting benchmark
+                    const endRL = startRL; // True elevation of end point is the true elevation of start point
+                    const knownDiff = 0;
+                    const misclose = measuredDiff - knownDiff; // Which is just measuredDiff
+                    
+                    return {
+                        totalBS,
+                        totalFS,
+                        measuredDiff,
+                        startRL,
+                        endRL,
+                        knownDiff,
+                        misclose,
+                        startPoint: startPointName,
+                        endPoint: endPointName,
+                        type: 'closed'
+                    };
+                } else if (lastPointRecordWithHeight) {
+                    // This is a closed run between two DIFFERENT known points
                     const endRL = lastPointRecordWithHeight.words['83'].value;
                     const knownDiff = endRL - startRL;
                     const misclose = measuredDiff - knownDiff;
@@ -1983,7 +2010,11 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                 const isFigure8 = fsPoints.slice(0, -1).includes(miscloseData.startPoint);
                 
                 if (isFigure8) {
-                    warningHTML += '<strong>⚠️ Complex Network Detected</strong><br>This run crosses itself (figure-8). Linear adjustment will force closure but may yield conflicting elevations at junction points. Rigorous least-squares is recommended.<br><br>';
+                    if (typeof window !== 'undefined' && elements.adjustmentWarning) {
+                        elements.adjustmentWarning.innerHTML = '<strong>⚠️ Adjustment Aborted: Complex Network Detected</strong><br>This run crosses itself (figure-8). Linear adjustment has been aborted because forcing a simple distribution on an intersecting network yields conflicting elevations at junction points. Rigorous least-squares adjustment (e.g., StarNet) is strictly required.';
+                        elements.adjustmentWarning.classList.remove('hidden');
+                    }
+                    return; // Abort all further adjustment math immediately
                 }
 
                 // WARNING 3: Zero Misclose / Suspicious Closure Prompt
@@ -2042,6 +2073,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                         const rec = this.data.find(r => r.lineNumber === fs.lineNumber);
                         if (rec && rec.calculatedRL !== undefined) {
                             rec.adjustedRL = rec.calculatedRL + correction;
+                            rec.adjustmentApplied = correction;
                         }
                     });
 
@@ -2050,6 +2082,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                         const rec = this.data.find(r => r.lineNumber === is.lineNumber);
                         if (rec && rec.calculatedRL !== undefined) {
                             rec.adjustedRL = rec.calculatedRL + correction;
+                            rec.adjustmentApplied = correction;
                         }
                     });
 
@@ -2058,6 +2091,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                         const bsRec = this.data.find(r => r.lineNumber === run.backsight.lineNumber);
                         if (bsRec && bsRec.calculatedRL !== undefined) {
                             bsRec.adjustedRL = bsRec.calculatedRL;
+                            bsRec.adjustmentApplied = 0; // No correction for the first backsight
                         }
                     }
                 });
@@ -2235,8 +2269,8 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                     report += cpInfo;
                 }
                 
-                report += '\nPOINT          TYPE          READING       DISTANCE      HEIGHT        CALCULATED RL SETUP\n';
-                report += '------------------------------------------------------------------------------------------\n';
+                report += '\nPOINT          TYPE          READING       DISTANCE      HEIGHT        SETUP\n';
+report += '--------------------------------------------------------------------------------\n';
                 
                 this.data.forEach(record => {
                     const point = (record.words['11']?.value || '').padEnd(14);
@@ -2247,7 +2281,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                     const calcRL = ((record.type === 'foresight' || record.type === 'intermediate') && record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4).padStart(13) : ''.padStart(13);
                     const setup = (String(record.setupNumber) || '').padStart(5);
                     
-                    report += `${point} ${type} ${reading} ${dist} ${hgt} ${calcRL} ${setup}\n`;
+                    report += `${point} ${type} ${reading} ${dist} ${hgt} ${setup}\n`;
                 });
                 
                 if (this.levelRuns && this.levelRuns.length > 0) {
@@ -2322,41 +2356,56 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                     const miscloseData = this.calculateMisclose();
                     
                     if (miscloseData && miscloseData.type === 'closed') {
-                        report += '\n\nLINEAR ADJUSTMENT SUMMARY\n';
-                        report += '========================\n';
-                        report += `Method Applied: ${this.processingOptions.adjustmentMethod === 'distance' ? 'By Distance Leveled' : 'By Setup Count (Turns)'}\n`;
-                        report += `Total Misclose Distributed: ${(miscloseData.misclose * 1000).toFixed(1)} mm\n`;
-                        report += '------------------------\n';
-                        report += 'FINAL ADJUSTED ELEVATIONS:\n';
-                        
-                        // Collect the final adjusted RL for each unique point
-                        const finalElevations = new Map();
-                        this.data.forEach(rec => {
-                            const pt = rec.words['11']?.value;
-                            if (pt && rec.adjustedRL !== undefined) {
-                                // Overwrite keeps the most recent adjusted value, 
-                                // which perfectly handles intermediate sights and closing loops
-                                finalElevations.set(pt, rec.adjustedRL); 
-                            }
-                        });
-
-                        // Sort and print the adjusted coordinates
-                        const sortedPts = Array.from(finalElevations.keys()).sort((a, b) => 
-                            a.localeCompare(b, undefined, { numeric: true })
-                        );
-                        
-                        sortedPts.forEach(pt => {
-                            report += `  ${pt.padEnd(15)} : ${finalElevations.get(pt).toFixed(4)} m\n`;
-                        });
-                        
-                        // Check for complex networks to append the warning to the report
+                        // Check for complex networks FIRST to reflect the aborted status
                         const fsPoints = this.levelRuns.map(run => run.foresights[run.foresights.length - 1]?.words['11']?.value).filter(Boolean);
                         const isFigure8 = fsPoints.slice(0, -1).includes(miscloseData.startPoint);
+
                         if (isFigure8) {
-                            report += '\n⚠️ WARNING: Complex Network (Figure-8) Detected.\n';
-                            report += 'Linear adjustment forces mathematical closure at the end point,\n';
-                            report += 'but intermediate junction points may not be rigorously resolved.\n';
-                            report += 'A Least-Squares adjustment is recommended for this dataset.\n';
+                            report += '\n\nLINEAR ADJUSTMENT ABORTED\n';
+                            report += '=========================\n';
+                            report += '⚠️ Complex Network (Figure-8) Detected.\n';
+                            report += 'Linear adjustment was aborted because forcing a simple closure on an\n';
+                            report += 'intersecting network yields conflicting and unreliable elevations.\n';
+                            report += 'Rigorous least-squares adjustment (e.g., StarNet) is required.\n';
+                        } else {
+                            report += '\n\nLINEAR ADJUSTMENT SUMMARY\n';
+                            report += '========================\n';
+                            report += `Method Applied: ${this.processingOptions.adjustmentMethod === 'distance' ? 'By Distance Leveled' : 'By Setup Count (Turns)'}\n`;
+                            report += `Total Misclose Distributed: ${(miscloseData.misclose * 1000).toFixed(1)} mm\n`;
+                            report += '------------------------\n';
+                            report += 'FINAL ADJUSTED ELEVATIONS:\n';
+                            
+                            // Collect the final adjusted RL and correction for each unique point
+                            const finalElevations = new Map();
+                            this.data.forEach(rec => {
+                                const pt = rec.words['11']?.value;
+                                if (pt && rec.adjustedRL !== undefined) {
+                                    // Store both the RL and the adjustment amount
+                                    finalElevations.set(pt, {
+                                        rl: rec.adjustedRL,
+                                        correction: rec.adjustmentApplied || 0
+                                    }); 
+                                }
+                            });
+
+                            // Sort and print the adjusted coordinates
+                            const sortedPts = Array.from(finalElevations.keys()).sort((a, b) => 
+                                a.localeCompare(b, undefined, { numeric: true })
+                            );
+                            
+                            sortedPts.forEach(pt => {
+                                const data = finalElevations.get(pt);
+                                const adjStr = data.rl.toFixed(4);
+                                let corrStr = '';
+                                
+                                // Format the adjustment string if it exists
+                                if (data.correction !== 0) {
+                                    const sign = data.correction > 0 ? '+' : '';
+                                    corrStr = ` (${sign}${(data.correction * 1000).toFixed(1)}mm)`;
+                                }
+                                
+                                report += `  ${pt.padEnd(15)} : ${adjStr} m${corrStr}\n`;
+                            });
                         }
                     }
                 }
@@ -2721,6 +2770,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
             changePointPrefix: document.getElementById('changePointPrefix'),
             includeTurnCount: document.getElementById('includeTurnCount'),
             showCPDetails: document.getElementById('showCPDetails'),
+            retainCalibration: document.getElementById('retainCalibration'),
             prefixSettings: document.getElementById('prefixSettings'),
             numericSettings: document.getElementById('numericSettings'),
             numericMin: document.getElementById('numericMin'),
@@ -3265,7 +3315,8 @@ function hideTpsAdvancedSection() {
             liveBanner.innerHTML = `
                 <div class="status info" style="margin: 0; padding: 15px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: center; border-left: 4px solid #005096; background: var(--card-bg);">
                     <div>
-                        <h4 style="margin:0 0 8px 0; color: var(--primary);">2-Peg Instrument Calibration Summary</h4>
+                        <h4 style="margin:0 0 4px 0; color: var(--primary);">2-Peg Instrument Calibration Summary</h4>
+<div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;">Method: ${escapeHtml(twoPegData.methodName)}</div>
                         <table style="width:100%; font-size:11px; margin-bottom:8px; border-collapse:collapse;">
                             <tr style="border-bottom:1px solid var(--border);">
                                 <td style="padding:4px 0;"><strong>Setup 1 (Mid):</strong></td>
@@ -3318,7 +3369,7 @@ function hideTpsAdvancedSection() {
             if (dataToDisplay.length === 0) {
                 const row = elements.dataTable.insertRow();
                 const cell = row.insertCell();
-                cell.colSpan = 8; // <--- Changed from 7 to 8
+                cell.colSpan = 7; 
                 cell.textContent = "No data to display in this view.";
                 cell.style.textAlign = 'center';
             } else {
@@ -3335,18 +3386,26 @@ function hideTpsAdvancedSection() {
                     const calculatedRL = (record.calculatedRL !== undefined && typeof record.calculatedRL === 'number') ? record.calculatedRL.toFixed(4) : '';
                     
                     // NEW: Grab the adjusted RL
-                    const adjustedRL = (record.adjustedRL !== undefined && typeof record.adjustedRL === 'number') ? record.adjustedRL.toFixed(4) : '';
+                    let adjustedRL = '';
+                    if (record.adjustedRL !== undefined && typeof record.adjustedRL === 'number') {
+                        adjustedRL = record.adjustedRL.toFixed(4);
+                        // Append the subtle correction text if an adjustment was made
+                        if (record.adjustmentApplied !== undefined && record.adjustmentApplied !== 0) {
+                            const adjMm = (record.adjustmentApplied * 1000).toFixed(1);
+                            const sign = record.adjustmentApplied > 0 ? '+' : '';
+                            adjustedRL += ` <span style="font-size: 0.85em; color: var(--text-dim); font-weight: normal;">(${sign}${adjMm}mm)</span>`;
+                        }
+                    }
 
-                    row.innerHTML = `
-                        <td>${escapeHtml(point)}</td>
-                        <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
-                        <td class="numeric">${escapeHtml(reading)}</td>
-                        <td class="numeric">${escapeHtml(distance)}</td>
-                        <td class="numeric">${escapeHtml(height)}</td>
-                        <td class="numeric"><span class="calculated-rl">${calculatedRL}</span></td>
-                        <td class="numeric"><span class="calculated-rl" style="color: var(--primary); font-weight: bold;">${adjustedRL}</span></td>
-                        <td class="numeric">${escapeHtml(String(setup))}</td>
-                    `;
+                   row.innerHTML = `
+    <td>${escapeHtml(point)}</td>
+    <td><span class="type-badge type-${escapeHtml(type)}">${escapeHtml(type)}</span></td>
+    <td class="numeric">${escapeHtml(reading)}</td>
+    <td class="numeric">${escapeHtml(distance)}</td>
+    <td class="numeric">${escapeHtml(height)}</td>
+    <td class="numeric"><span class="calculated-rl">${calculatedRL}</span></td>
+    <td class="numeric">${escapeHtml(String(setup))}</td>
+`;
                     elements.dataTable.appendChild(row);
                 });
             }
