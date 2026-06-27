@@ -156,7 +156,7 @@
                 <button class="btn" id="reportBtn">Report</button>
                 <button class="btn" id="starnetBtn">StarNet</button>
                 <button class="btn" id="csvBtn">CSV</button>
-                <button class="btn primary" id="levelPdfBtn">QC PDF Report</button>
+                <button class="btn" id="levelPdfBtn">QC PDF Report</button>
                 <button class="btn" id="advancedBtn">⚙️ Advanced</button>
             </div>
         </div>
@@ -164,8 +164,8 @@
 
         <div class="section hidden" id="tpsActionsSection">
     <div class="actions">
-        <button class="btn primary" id="tpsStarnetBtn">Export StarNet File</button>
-        <button class="btn primary" id="tpsPdfBtn">QC PDF Report</button>
+        <button class="btn" id="tpsStarnetBtn">Export StarNet File</button>
+        <button class="btn" id="tpsPdfBtn">QC PDF Report</button>
         <button class="btn" id="tpsAdvancedBtn">⚙️ Advanced</button>
     </div>
 </div>
@@ -224,7 +224,7 @@
     </label>
 </div>
 
-                <button class="btn primary" id="applyTpsAdvanced" style="margin-top: 25px;">
+                <button class="btn " id="applyTpsAdvanced" style="margin-top: 25px;">
                     <span id="applyTpsText">Apply & Reprocess</span>
                     <div id="applyTpsSpinner" class="loading-spinner hidden" style="display: none;"></div>
                 </button>
@@ -3557,9 +3557,21 @@ function hideTpsAdvancedSection() {
                         let qaFlag = '';
                         const faceIspreadFail = obs.faceData.faceI?.qa.spread.status === 'fail';
                         const faceIIspreadFail = obs.faceData.faceII?.qa.spread.status === 'fail';
+                        
+                        // NEW: Detect if Dixon's Q-Test isolated a statistical outlier in either face
+                        const faceIhasOutlier = obs.faceData.faceI?.qa.spread.status === 'outlier';
+                        const faceIIhasOutlier = obs.faceData.faceII?.qa.spread.status === 'outlier';
+                        
                         const faceCompareFail = obs.faceData.faceI?.qa.face.status === 'fail';
-                        if (faceIspreadFail || faceIIspreadFail || faceCompareFail) {
-                            qaFlag = ` <span class="qa-fail" title="QA Check Failed: Expand for details">!</span>`;
+                        
+                        // Trigger flag for any failures or isolated outliers
+                        if (faceIspreadFail || faceIIspreadFail || faceIhasOutlier || faceIIhasOutlier || faceCompareFail) {
+                            // Customize the tooltip message depending on what was found
+                            const titleText = (faceIhasOutlier || faceIIhasOutlier) 
+                                ? "Outlier Detected (Dixon's Q-Test): Expand for details" 
+                                : "QA Check Failed: Expand for details";
+                                
+                            qaFlag = ` <span class="qa-fail" title="${titleText}">!</span>`;
                         }
                         const summaryRow = document.createElement('tr');
                         summaryRow.className = 'summary-row';
@@ -3581,7 +3593,10 @@ function hideTpsAdvancedSection() {
                         if (obs.faceData.faceI) {
                             const faceI = obs.faceData.faceI;
                             const l2_faceI_id = `l2-details-f1-${obsCounter}`;
-                            const qaSpreadFail = faceI.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                            const qaSpreadStatus = faceI.qa.spread.status;
+const qaSpreadFail = (qaSpreadStatus === 'fail' || qaSpreadStatus === 'outlier') 
+    ? ` <span class="qa-fail" title="${qaSpreadStatus === 'outlier' ? 'Outlier Detected (Dixon\'s Q-Test)' : 'Internal spread exceeds tolerance'}">!</span>` 
+    : '';
                             l1_html += `
                                 <tr class="summary-row" data-target-id="${l2_faceI_id}">
     <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceI_id}">+</span> ${escapeHtml(faceI.pointId)}${qaSpreadFail}</td>
@@ -3627,10 +3642,17 @@ function hideTpsAdvancedSection() {
                         if (obs.faceData.faceII) {
                             const faceII = obs.faceData.faceII;
                             const l2_faceII_id = `l2-details-f2-${obsCounter}`;
-                            const qaSpreadFail = faceII.qa.spread.status === 'fail' ? ` <span class="qa-fail" title="Internal spread exceeds tolerance">!</span>` : '';
+                            
+                            // 1. Declare it here as 'qaSpreadFailII'
+                            const qaSpreadStatusII = faceII.qa.spread.status;
+                            const qaSpreadFailII = (qaSpreadStatusII === 'fail' || qaSpreadStatusII === 'outlier') 
+                                ? ` <span class="qa-fail" title="${qaSpreadStatusII === 'outlier' ? 'Outlier Detected (Dixon\'s Q-Test)' : 'Internal spread exceeds tolerance'}">!</span>` 
+                                : '';
+                            
                              l1_html += `
                                 <tr class="summary-row" data-target-id="${l2_faceII_id}">
-    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFail}</td>
+                                    
+                                    <td style="width: 25%;"><span class="expander" data-target-id="${l2_faceII_id}">+</span> ${escapeHtml(faceII.pointId)}${qaSpreadFailII}</td>
                                     <td style="width: 15%;">${faceII.face} (${faceII.count} obs)</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanHz)}</td>
                                     <td class="numeric" style="width: 15%;">${formatDecimalDegrees(faceII.meanV)}</td>
