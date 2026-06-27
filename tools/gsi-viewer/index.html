@@ -69,7 +69,9 @@
                         <ol>
                             <li>Upload your GSI file using drag & drop or file selection.</li>
                             <li>Review the parsed data in the preview table.</li>
+                            <li>Remove calibration data and erroneous lines if needed, using the interactive record editor.</li>
                             <li>Configure advanced options if needed.</li>
+                            <li>Set known benchmark if required.</li>
                             <li>Export your data in the desired format.</li>
                         </ol><br>
 
@@ -154,6 +156,7 @@
                 <button class="btn" id="reportBtn">Report</button>
                 <button class="btn" id="starnetBtn">StarNet</button>
                 <button class="btn" id="csvBtn">CSV</button>
+                <button class="btn primary" id="levelPdfBtn">QC PDF Report</button>
                 <button class="btn" id="advancedBtn">⚙️ Advanced</button>
             </div>
         </div>
@@ -233,12 +236,19 @@
 
 <div class="section hidden" id="advancedSection">
     <div class="section-title">
-        ⚙️ Advanced TPS Options
+        ⚙️ Advanced Leveling Options
         <button class="btn" id="advancedToggle">Hide</button>
     </div>
             
             <div class="advanced-content">
                 <div class="advanced-grid">
+                    
+                    <div class="advanced-group" style="grid-column: 1 / -1; border-left: 3px solid var(--primary); padding-left: 15px; margin-bottom: 10px;">
+                        <h4>Manual Data Management Matrix</h4>
+                        <p class="help-text">Surgically inspect and isolate your raw file records. Open the matrix viewport to explicitly assign shots to your 2-peg calibration loop or drop false/erroneous field strikes completely.</p>
+                        <button class="btn primary" id="openEditorBtn" style="width: auto; margin-top: 5px;">🔧 Open Interactive Record Editor</button>
+                    </div>
+
                     <div class="advanced-group">
                         <h4>Change Point Processing</h4>
                         <label class="checkbox-label">
@@ -300,7 +310,7 @@
                         <h4>Adjustment Settings</h4>
                         <label class="checkbox-label">
                             <input type="checkbox" id="applyAdjustment">
-                            <span>Apply Linear Adjustment</span>
+                            <span>Apply Linear Adjustment (Beta)</span>
                         </label>
                         
                         <div id="adjustmentSettings" style="display: none; margin-top: 10px; margin-bottom: 15px; padding-left: 25px; border-left: 2px solid var(--border);">
@@ -439,6 +449,35 @@
             © Survey Tools 2026
         </div>
     </div>
+
+    <div id="editorModal" class="section" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+        <div style="background: var(--bg); width: 100%; max-width: 950px; height: 85vh; display: flex; flex-direction: column; border-radius: 6px; box-shadow: 0 4px 25px rgba(0,0,0,0.4); border: 1px solid var(--border); overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card-bg); border-bottom: 1px solid var(--border);">
+                <span style="font-weight: bold; font-size: 16px;">🔧 Interactive Record Management Matrix</span>
+                <button class="btn" id="closeEditorTopBtn" style="padding: 4px 10px; font-size: 14px;">✕ Close</button>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 20px; box-sizing: border-box;">
+                <p class="help-text" style="margin-bottom: 15px;">Review the raw data file below line-by-line. Ticking <strong>Calibration</strong> sends those exact shots directly to the 2-Peg collimation reduction math engine. Ticking <strong>Exclude</strong> drops the row from the levelling adjustments entirely (perfect for field errors).</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead>
+                        <tr style="background: var(--card-bg); border-bottom: 2px solid var(--border); text-align: left;">
+                            <th style="padding: 8px; width: 70px;">Line #</th>
+                            <th style="padding: 8px; width: 120px;">Point ID</th>
+                            <th style="padding: 8px;">Raw GSI Data Stream String</th>
+                            <th style="padding: 8px; text-align: center; width: 110px;">Calibration</th>
+                            <th style="padding: 8px; text-align: center; width: 100px;">Exclude</th>
+                        </tr>
+                    </thead>
+                    <tbody id="editorTableBody"></tbody>
+                </table>
+            </div>
+            <div style="padding: 15px 20px; background: var(--card-bg); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn" id="cancelEditorBtn">Cancel</button>
+                <button class="btn primary" id="saveEditorBtn">💾 Apply Overrides & Reprocess Run</button>
+            </div>
+        </div>
+    </div>
+    
 
     
     
@@ -684,6 +723,170 @@
     doc.save(`${filename}_QC_Report.pdf`);
 }
 
+exportLevelingQCPDF(filename) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('landscape'); 
+        
+        // --- Shared Page & Footer Options ---
+        const sharedOptions = {
+            theme: 'grid',
+            headStyles: { fillColor: [50, 50, 50], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 3 },
+            didDrawPage: function (data) {
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "italic");
+                doc.setTextColor(130, 130, 130); 
+                
+                doc.text('Page ' + doc.internal.getNumberOfPages(), data.settings.margin.left, pageHeight - 10);
+                const footerText = `Report generated by Survey Tools © ${new Date().getFullYear()}`;
+                const textWidth = doc.getTextWidth(footerText);
+                doc.text(footerText, pageWidth - data.settings.margin.right - textWidth, pageHeight - 10);
+                doc.setTextColor(0, 0, 0); // Reset for standard text
+            }
+        };
+
+        // --- 1. Document Header ---
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("Levelling Quality Control Report", 14, 20);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`File Name: ${filename}.gsi`, 14, 30);
+        doc.text(`Report Generated: ${new Date().toLocaleString('en-GB')}`, 14, 35);
+        doc.text(`Method: ${this.stats.method}  |  Total Setups: ${this.stats.setupCount}`, 14, 40);
+
+        let currentY = 50; // Starting Y coordinate for the first table
+
+        // --- 2. Loop Closure Summary ---
+        const miscloseData = this.calculateMisclose();
+        if (miscloseData) {
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("Loop Closure Check", 14, currentY);
+            
+            const closureBody = [
+                ['Total Backsight (ΣBS)', `${miscloseData.totalBS.toFixed(5)} m`],
+                ['Total Foresight (ΣFS)', `${miscloseData.totalFS.toFixed(5)} m`],
+                ['Measured ΔH', `${miscloseData.measuredDiff.toFixed(5)} m`]
+            ];
+
+            if (miscloseData.type === 'closed') {
+                closureBody.push(['Start Point RL', `${miscloseData.startRL.toFixed(4)} m`]);
+                closureBody.push(['End Point RL', `${miscloseData.endRL.toFixed(4)} m`]);
+                closureBody.push(['Known ΔH', `${miscloseData.knownDiff.toFixed(5)} m`]);
+                closureBody.push(['Misclose', `${(miscloseData.misclose * 1000).toFixed(1)} mm`]);
+            } else {
+                closureBody.push(['Status', 'Open run (Does not close on known height)']);
+            }
+
+            doc.autoTable({
+                ...sharedOptions,
+                startY: currentY + 4,
+                head: [['Parameter', 'Result']],
+                body: closureBody,
+                tableWidth: 120, // Keep summary tables compact
+                margin: { left: 14 }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+        }
+
+        // --- 3. 2-Peg Test Summary (If Detected) ---
+        if (this.calibrationInfo.isCalibration) {
+            const twoPegData = this.analyze2PegTest();
+            if (twoPegData) {
+                // Check if we need a page break before starting
+                if (currentY > doc.internal.pageSize.height - 40) { doc.addPage(); currentY = 20; }
+                
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "bold");
+                doc.text("2-Peg Instrument Calibration", 14, currentY);
+
+                const pegBody = [
+                    ['True ΔH (Midpoint)', `${twoPegData.trueDiff.toFixed(5)} m`],
+                    ['Apparent ΔH (End)', `${twoPegData.apparentDiff.toFixed(5)} m`],
+                    ['Collimation Error', `${(twoPegData.error * 1000).toFixed(2)} mm`],
+                    ['Collimation Angle', `${twoPegData.collimationSeconds.toFixed(1)}"`]
+                ];
+
+                doc.autoTable({
+                    ...sharedOptions,
+                    startY: currentY + 4,
+                    head: [['Metric', 'Value']],
+                    body: pegBody,
+                    tableWidth: 120,
+                    margin: { left: 14 }
+                });
+                currentY = doc.lastAutoTable.finalY + 15;
+            }
+        }
+
+        // --- 4. Point Repeatability ---
+        const repeatability = this.analyzePointRepeatability();
+        if (repeatability && repeatability.length > 0) {
+            if (currentY > doc.internal.pageSize.height - 40) { doc.addPage(); currentY = 20; }
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("Point Repeatability Analysis", 14, currentY);
+
+            const repBody = repeatability.map(item => [
+                item.pointId,
+                item.count,
+                item.minRL.toFixed(4),
+                item.maxRL.toFixed(4),
+                item.spread.toFixed(1),
+                item.avgRL.toFixed(4)
+            ]);
+
+            doc.autoTable({
+                ...sharedOptions,
+                startY: currentY + 4,
+                head: [['Point ID', 'Observations', 'Min RL (m)', 'Max RL (m)', 'Spread (mm)', 'Average RL (m)']],
+                body: repBody,
+                margin: { left: 14 }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+        }
+
+        // --- 5. Main Observation Data ---
+        if (currentY > doc.internal.pageSize.height - 40) { doc.addPage(); currentY = 20; }
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Verbose Observation Data", 14, currentY);
+
+        const tableBody = [];
+        this.data.forEach(record => {
+            const point = record.words['11'] ? record.words['11'].value : '---';
+            const type = record.type || '---';
+            
+            let reading = '---';
+            const readingWord = ['331', '332', '333', '330'].map(wi => record.words[wi]).find(wordObj => wordObj && typeof wordObj.value === 'number');
+            if (readingWord) reading = readingWord.value.toFixed(5);
+            
+            const distance = (record.words['32'] && typeof record.words['32'].value === 'number') ? record.words['32'].value.toFixed(3) : '---';
+            const calcRL = (record.calculatedRL !== undefined) ? record.calculatedRL.toFixed(4) : '---';
+            const adjRL = (record.adjustedRL !== undefined) ? record.adjustedRL.toFixed(4) : '---';
+            const setup = record.setupNumber || '---';
+
+            tableBody.push([point, type, reading, distance, calcRL, adjRL, setup]);
+        });
+
+        doc.autoTable({
+            ...sharedOptions,
+            startY: currentY + 4,
+            head: [['Point ID', 'Observation Type', 'Reading (m)', 'Distance (m)', 'Calculated RL (m)', 'Adjusted RL (m)', 'Setup #']],
+            body: tableBody,
+            margin: { left: 14 }
+        });
+
+        // --- 6. Save the PDF ---
+        doc.save(`${filename}_Levelling_QC_Report.pdf`);
+    }
+
             parse(text) {
                 if (text.length > MAX_FILE_SIZE) {
                     throw new Error('File too large. Maximum size is 50MB.');
@@ -728,6 +931,8 @@
                     const record = this.parseLine(line);
                     if (record) {
                         record.lineNumber = i + 1;
+                        record.isManualCalibration = false; 
+                        record.isManualExcluded = false;
                         this.data.push(record);
                         processedRecords++;
                     }
@@ -751,36 +956,27 @@
                     showStatus(`✓ Parsed and fully processed ${this.fullData.length} TPS records.`, 'success');
 
                 } else if (this.fileType === 'Levelling') {
-                    // --- LEVELLING LOGIC PATH (Existing Stable Logic) ---
-                    const allRuns = this.buildLevelRuns(this.fullData);
-                    this.calibrationInfo = this.identifyCalibrationData(allRuns);
-                    this.data = [...this.fullData];
-
-                    if (this.calibrationInfo.isCalibration && !this.processingOptions.retainCalibrationData) {
-                        this.displayCalibrationWarning(this.calibrationInfo);
-                        const endLineMatch = this.calibrationInfo.recordRange.match(/to\s(\d+)/);
-                        if (endLineMatch && endLineMatch[1]) {
-                            const endLine = parseInt(endLineMatch[1]);
-                            const calibrationEndIndex = this.fullData.findIndex(rec => rec.lineNumber === endLine);
-                            if (calibrationEndIndex !== -1) {
-                                const mainDataStartIndex = this.fullData.findIndex((rec, index) => index > calibrationEndIndex && rec.words['83']);
-                                if (mainDataStartIndex !== -1) {
-                                    this.data = this.fullData.slice(mainDataStartIndex);
-                                    showStatus(`✓ Parsed ${this.fullData.length} Level records. Calibration test excluded. Processing ${this.data.length} main survey records.`, 'success');
-                                } else {
-                                    this.data = []; 
-                                    showStatus(`✓ Parsed ${this.fullData.length} records. Calibration test found, but no subsequent survey data detected.`, 'warning');
-                                }
-                            }
-                        }
+                    // --- LEVELLING LOGIC PATH (Manual Extraction Matrix) ---
+                    
+                    // Filter row logs explicitly assigned to calibration that aren't dropped
+                    const calibrationRecords = this.fullData.filter(rec => rec.isManualCalibration && !rec.isManualExcluded);
+                    
+                    if (calibrationRecords.length > 0) {
+                        this.calibrationInfo = {
+                            isCalibration: true,
+                            type: 'Manual 2-Peg Test Cluster',
+                            records: calibrationRecords
+                        };
                     } else {
-                        if (this.calibrationInfo.isCalibration) { 
-                             this.showFormatStatus('ℹ️ Calibration data detected and included in the main survey as per settings.', 'info');
-                        } else { 
-                             document.getElementById('formatStatus').classList.add('hidden');
-                        }
-                        showStatus(`✓ Parsed ${this.fullData.length} level records successfully.`, 'success');
+                        this.calibrationInfo = { isCalibration: false, records: [] };
+                        const fmtStatus = document.getElementById('formatStatus');
+                        if (fmtStatus) fmtStatus.classList.add('hidden');
                     }
+                    
+                    
+                    this.data = this.fullData.filter(rec => !rec.isManualExcluded && !rec.isManualCalibration);
+                    
+                    showStatus(`✓ Processing complete. Active levelling records: ${this.data.length}`, 'success');
                     this.calculateStatsForCurrentData();
                 }
             }
@@ -916,6 +1112,8 @@
                 result.isValid = validWords > 0;
                 return result;
             }
+
+            
 
             determineGSIFormat(analysis) {
                 
@@ -1116,133 +1314,9 @@
 
             
 
-            identifyCalibrationData(runsForDetection) {
-                const result = { isCalibration: false, type: null, confidence: 0, issues: [], recordRange: null };
-
-                // --- NEW PRIMARY METHOD: Detect by WI 41 ---
-                // The WI 41 block is the definitive start of a measured line. Anything before it is setup/calibration.
-                const methodCodeRecord = this.fullData.find(r => r.words['41'] && r.words['41'].data.includes('?'));
-                if (methodCodeRecord) {
-                    const firstRecord = this.fullData[0];
-                    // If the method code is not the very first line, flag everything before it.
-                    if (methodCodeRecord.lineNumber > firstRecord.lineNumber) {
-                        result.isCalibration = true;
-                        result.type = 'Instrument Setup / Calibration';
-                        result.confidence = 100; // This is a definitive, not heuristic, check.
-                        result.recordRange = `Records ${firstRecord.lineNumber} to ${methodCodeRecord.lineNumber - 1}`;
-                        result.issues.push(`Data preceding the Method Code (WI 41) on line ${methodCodeRecord.lineNumber} has been isolated.`);
-                        return result;
-                    }
-                }
             
 
-                
-                // --- END NEW METHOD ---
-
-
-                // --- FALLBACK METHOD: Heuristic Pattern Recognition (Original Logic) ---
-                const points = new Set(this.fullData.map(r => r.words['11']?.value).filter(Boolean));
-                const uniquePoints = Array.from(points);
-
-                const earlyRecords = this.fullData.slice(0, 10);
-                const early2PegCheck = this.checkEarly2PegPattern(earlyRecords);
-                if (early2PegCheck.is2Peg) {
-                    result.isCalibration = true;
-                    result.type = '2-peg-test';
-                    result.confidence = early2PegCheck.confidence;
-                    result.issues = early2PegCheck.issues;
-                    result.recordRange = early2PegCheck.recordRange;
-                    return result;
-                }
-                
-                if (runsForDetection.length > 5 || uniquePoints.length > 8) {
-                    return result; // Not a small calibration file, so exit.
-                }
-                
-                let confidenceScore = 0;
-                const calibrationNames = uniquePoints.filter(p => /^(PEG|PG|A|B|TEST|CAL|2PEG|TP[12])$/i.test(p) || /^[AB][12]?$/i.test(p));
-                if (calibrationNames.length >= 2) {
-                    confidenceScore += 30;
-                    result.issues.push(`Calibration-style names detected: ${calibrationNames.join(', ')}`);
-                }
-                if (uniquePoints.length === 2 && runsForDetection.length >= 2 && runsForDetection.length <= 3) {
-                    confidenceScore += 25;
-                    result.issues.push('Classic 2-peg pattern: 2 points, 2-3 setups');
-                }
-                const repeatedPattern = this.checkRepeatedPointPattern(runsForDetection);
-                if (repeatedPattern.hasRepeated) {
-                    confidenceScore += 20;
-                    result.issues.push(`Points observed multiple times: ${repeatedPattern.repeatedPoints.join(', ')}`);
-                }
-                if (this.fullData.length <= 10 && uniquePoints.length <= 4) {
-                    confidenceScore += 10;
-                    result.issues.push('Limited data set typical of calibration');
-                }
-                
-                if (confidenceScore >= 40) {
-                    result.isCalibration = true;
-                    result.type = confidenceScore >= 60 ? '2-peg-test' : 'possible-calibration';
-                    result.confidence = Math.min(confidenceScore, 100);
-                    if (!result.recordRange && runsForDetection.length > 0) {
-                        const firstLine = runsForDetection[0].backsight.lineNumber;
-                        const lastRun = runsForDetection[runsForDetection.length - 1];
-                        const lastLine = lastRun.foresights.length > 0 ? lastRun.foresights.slice(-1)[0].lineNumber : lastRun.backsight.lineNumber;
-                        result.recordRange = `Lines ${firstLine} to ${lastLine}`;
-                    }
-                }
-                
-                return result;
-            }
-
-            checkEarly2PegPattern(records) {
-                const result = { is2Peg: false, confidence: 0, issues: [], recordRange: null };
-                if (records.length < 4) return result;
-
-                const points = new Set();
-                records.forEach(r => {
-                    if (r.words['11']?.value) {
-                        points.add(r.words['11'].value);
-                    }
-                });
-
-                const uniquePoints = Array.from(points);
-
-                // A classic 2-peg test has exactly two unique points (e.g., PEG A, PEG B).
-                if (uniquePoints.length !== 2) {
-                    return result;
-                }
-
-                // It typically involves two setups.
-                const setupCount = new Set(records.map(r => r.setupNumber).filter(Boolean)).size;
-                
-                let confidenceScore = 0;
-                result.issues.push(`Found 2 unique points: ${uniquePoints.join(', ')}`);
-
-                if (setupCount >= 2) {
-                    confidenceScore += 50;
-                    result.issues.push(`Detected ${setupCount} instrument setups.`);
-                }
-                
-                // Check for a pattern like: BS to A, FS to B, then BS to B, FS to A
-                const hasExpectedReadings = records.filter(r => 
-                    (r.type === 'backsight' && r.words['11']?.value === uniquePoints[0]) ||
-                    (r.type === 'foresight' && r.words['11']?.value === uniquePoints[1])
-                ).length >= 2;
-
-                if (hasExpectedReadings) {
-                    confidenceScore += 30;
-                }
-
-                if (confidenceScore >= 80) {
-                    result.is2Peg = true;
-                    result.confidence = Math.min(100, confidenceScore);
-                    const firstLine = records[0].lineNumber;
-                    const lastLine = records[records.length - 1].lineNumber;
-                    result.recordRange = `Lines ${firstLine} to ${lastLine}`;
-                }
-                
-                return result;
-            }
+            
 
             
 
@@ -1285,43 +1359,56 @@
                 return result;
             }
 
-            displayCalibrationWarning(calibrationInfo) {
-                const messages = [];
-                messages.push(`🔶 ${calibrationInfo.type.toUpperCase()} DETECTED (${calibrationInfo.confidence}% confidence).`);
-                if (calibrationInfo.recordRange) {
-                    messages.push(`📍 Located in ${calibrationInfo.recordRange}. These records will be excluded by default.`);
-                }
-                messages.push('\nIssues found:');
-                calibrationInfo.issues.forEach(issue => {
-                    messages.push(`• ${issue}`);
-                });
-                
-                const messageText = messages.join('\n');
-                this.showFormatStatus(messageText, 'warning');
+            analyze2PegTest() {
+    const obs = {};
+    const recordsToCompute = this.calibrationInfo?.records || [];
+    
+    recordsToCompute.forEach(r => {
+        const pt = r.words['11']?.value;
+        const dist = r.words['32']?.value;
+        
+        // Map all four structural target keys used in Leica Check & Adjust software
+        let reading = null;
+        if (r.words['331']) reading = r.words['331'].value; // A1 Reading
+        else if (r.words['332']) reading = r.words['332'].value; // B1 Reading
+        else if (r.words['336']) reading = r.words['336'].value; // B2 Reading
+        else if (r.words['335']) reading = r.words['335'].value; // A2 Reading
 
-                const formatStatusEl = document.getElementById('formatStatus');
-                
-                const oldActions = formatStatusEl.querySelector('#calibration-actions');
-                if(oldActions) oldActions.remove();
+        if (reading !== null && dist !== undefined) {
+            if (r.words['331']) obs.A1 = { reading, dist, pt };
+            if (r.words['332']) obs.B1 = { reading, dist, pt };
+            if (r.words['336']) obs.B2 = { reading, dist, pt };
+            if (r.words['335']) obs.A2 = { reading, dist, pt };
+        }
+    });
 
-                const actionsContainer = document.createElement('div');
-                actionsContainer.style.marginTop = '10px';
-                actionsContainer.id = 'calibration-actions';
+    // Verify all 4 required positions are filled
+    if (!obs.A1 || !obs.B1 || !obs.B2 || !obs.A2) return null;
 
-                const showCalibBtn = document.createElement('button');
-                showCalibBtn.textContent = '🔍 View Calibration Test Only';
-                showCalibBtn.className = 'btn status-action';
-                showCalibBtn.onclick = () => showCalibrationOnly(); 
-                
-                const showMainBtn = document.createElement('button');
-                showMainBtn.textContent = '📋 View Main Survey Only';
-                showMainBtn.className = 'btn status-action';
-                showMainBtn.onclick = () => showMainSurveyOnly();
+    // --- Leica Calibration Formula Reduction ---
+    // Setup 1 (Midpoint) establishes the True Height Difference (dH_true)
+    const trueDiff = obs.A1.reading - obs.B1.reading;
+    
+    // Setup 2 (Near Staff A) establishes the Apparent Height Difference (dH_apparent)
+    const apparentDiff = obs.A2.reading - obs.B2.reading;
 
-                actionsContainer.appendChild(showCalibBtn);
-                actionsContainer.appendChild(showMainBtn);
-                formatStatusEl.appendChild(actionsContainer);
-            }
+    // Collimation error calculation (Apparent difference minus True difference)
+    const error = apparentDiff - trueDiff;
+    
+    // Distance differences delta
+    const distDiff = (obs.A2.dist - obs.A1.dist) - (obs.B2.dist - obs.B1.dist);
+
+    if (Math.abs(distDiff) < 0.1) return null; // Avoid boundary division issues
+
+    const collimationMmPerM = (error * 1000) / distDiff;
+    const collimationSeconds = collimationMmPerM * 206.265; // Convert angle ratio to arcseconds
+
+    return {
+        A1: obs.A1, B1: obs.B1, B2: obs.B2, A2: obs.A2,
+        trueDiff, apparentDiff, error, distDiff,
+        collimationMmPerM, collimationSeconds
+    };
+}
 
             buildLevelRuns(dataToProcess) {
                 const runs = [];
@@ -1882,7 +1969,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
                 // WARNING 1: Open Run / Cannot Adjust
                 if (!miscloseData || miscloseData.type !== 'closed') {
                     if (typeof window !== 'undefined' && elements.adjustmentWarning) {
-                        elements.adjustmentWarning.innerHTML = '<strong>⚠️ Cannot Adjust Open Run</strong><br>This level run does not close onto its starting point or a known independent benchmark. Linear adjustment requires a mathematically closed loop or link traverse.';
+                        elements.adjustmentWarning.innerHTML = '<strong>⚠️ Cannot Adjust Open Run</strong><br>This level run does not close onto its starting point or a known independent benchmark. Linear adjustment requires a mathematically closed loop or known independent benchmark.';
                         elements.adjustmentWarning.classList.remove('hidden');
                     }
                     return; 
@@ -2615,6 +2702,7 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
             reportBtn: document.getElementById('reportBtn'),
             starnetBtn: document.getElementById('starnetBtn'),
             csvBtn: document.getElementById('csvBtn'),
+            levelPdfBtn: document.getElementById('levelPdfBtn'),
             advancedBtn: document.getElementById('advancedBtn'),
             tpsStarnetBtn: document.getElementById('tpsStarnetBtn'),
             tpsAdvancedBtn: document.getElementById('tpsAdvancedBtn'),
@@ -2633,7 +2721,6 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
             changePointPrefix: document.getElementById('changePointPrefix'),
             includeTurnCount: document.getElementById('includeTurnCount'),
             showCPDetails: document.getElementById('showCPDetails'),
-            retainCalibration: document.getElementById('retainCalibration'),
             prefixSettings: document.getElementById('prefixSettings'),
             numericSettings: document.getElementById('numericSettings'),
             numericMin: document.getElementById('numericMin'),
@@ -2653,7 +2740,15 @@ detectLinearOutlier(values, confidenceThreshold = 0.829) {
             qaVaSpread: document.getElementById('qaVaSpread'),
             qaSdSpread: document.getElementById('qaSdSpread'),
             qaFaceHz: document.getElementById('qaFaceHz'),
-            qaFaceVa: document.getElementById('qaFaceVa')
+            qaFaceVa: document.getElementById('qaFaceVa'),
+
+            // Matrix Record Editor UI Elements
+            openEditorBtn: document.getElementById('openEditorBtn'),
+            closeEditorTopBtn: document.getElementById('closeEditorTopBtn'),
+            cancelEditorBtn: document.getElementById('cancelEditorBtn'),
+            saveEditorBtn: document.getElementById('saveEditorBtn'),
+            editorModal: document.getElementById('editorModal'),
+            editorTableBody: document.getElementById('editorTableBody'),
         };
 
 
@@ -2786,6 +2881,21 @@ elements.tpsPdfBtn.addEventListener('click', () => {
             }, 300);
         }
     });
+    if (elements.levelPdfBtn) {
+            elements.levelPdfBtn.addEventListener('click', () => {
+                try {
+                    parser.exportLevelingQCPDF(currentFilename); // We will create this method next
+                    
+                    // Brief UI feedback
+                    const originalText = elements.levelPdfBtn.textContent;
+                    elements.levelPdfBtn.textContent = '✓ Report Generated';
+                    setTimeout(() => { elements.levelPdfBtn.textContent = originalText; }, 2000);
+                } catch (error) {
+                    console.error('Leveling PDF Generation Error:', error);
+                    showStatus('✗ Failed to generate Leveling PDF. Check console.', 'error');
+                }
+            });
+        }
 
             elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
             elements.uploadArea.addEventListener('dragover', handleDragOver);
@@ -3021,6 +3131,82 @@ function hideTpsAdvancedSection() {
             
             reader.readAsText(file);
         }
+
+        // --- Manual Matrix Viewport Render Mechanics ---
+        function renderEditorMatrix() {
+            elements.editorTableBody.innerHTML = '';
+            const linesArray = parser.rawData.split(/\r?\n/);
+
+            parser.fullData.forEach(record => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border)';
+                
+                const pointId = record.words['11']?.value || '---';
+                let rawLine = linesArray[record.lineNumber - 1] || '';
+                
+                // Truncate display strings to prevent rendering breaks
+                if (rawLine.length > 75) rawLine = rawLine.substring(0, 72) + '...';
+
+                tr.innerHTML = `
+                    <td style="padding: 8px; color: var(--text-dim);">${record.lineNumber}</td>
+                    <td style="padding: 8px;"><strong>${escapeHtml(pointId)}</strong></td>
+                    <td style="padding: 8px; font-family: monospace; color: var(--text-dim);">${escapeHtml(rawLine)}</td>
+                    <td style="padding: 8px; text-align: center;">
+                        <input type="checkbox" class="calib-chk" data-line="${record.lineNumber}" ${record.isManualCalibration ? 'checked' : ''}>
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                        <input type="checkbox" class="exclude-chk" data-line="${record.lineNumber}" ${record.isManualExcluded ? 'checked' : ''}>
+                    </td>
+                `;
+
+                // Maintain clean constraints (A line can't be both Calibration and Excluded)
+                const calibBox = tr.querySelector('.calib-chk');
+                const excludeBox = tr.querySelector('.exclude-chk');
+
+                calibBox.addEventListener('change', () => { if (calibBox.checked) excludeBox.checked = false; });
+                excludeBox.addEventListener('change', () => { if (excludeBox.checked) calibBox.checked = false; });
+
+                elements.editorTableBody.appendChild(tr);
+            });
+        }
+
+        elements.openEditorBtn.addEventListener('click', () => {
+            if (!parser.fullData || parser.fullData.length === 0) {
+                alert('Please upload and load a valid GSI file first.');
+                return;
+            }
+            renderEditorMatrix();
+            elements.editorModal.style.display = 'flex';
+        });
+
+        const hideEditorModal = () => { elements.editorModal.style.display = 'none'; };
+        elements.closeEditorTopBtn.addEventListener('click', hideEditorModal);
+        elements.cancelEditorBtn.addEventListener('click', hideEditorModal);
+
+        elements.saveEditorBtn.addEventListener('click', () => {
+            const rows = elements.editorTableBody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const calibChk = row.querySelector('.calib-chk');
+                const excludeChk = row.querySelector('.exclude-chk');
+                const lineNum = parseInt(calibChk.dataset.line);
+
+                const record = parser.fullData.find(r => r.lineNumber === lineNum);
+                if (record) {
+                    record.isManualCalibration = calibChk.checked;
+                    record.isManualExcluded = excludeChk.checked;
+                }
+            });
+
+            // Re-run execution pipeline with manual parameters active
+            parser.processAndAnalyze();
+            updateLevelingUI();
+            hideEditorModal();
+            
+            // Re-trigger the active text view report tab to synchronize changes
+            elements.reportBtn.click();
+            showStatus('✓ Run matrix overrides modified successfully. Levelling adjustments recomputed.', 'success');
+        });
         
         function resetUI() {
     ['status', 'formatStatus', 'statsSection', 'tpsStatsSection', 'actionsSection', 'tpsActionsSection', 'previewSection', 'outputSection', 'advancedSection', 'analysisSection', 'tpsPreviewSection'].forEach(id => {
@@ -3060,6 +3246,62 @@ function hideTpsAdvancedSection() {
             elements.levelStatSetups.textContent = parser.stats.setupCount;
             elements.levelStatObservations.textContent = observationCount;
             elements.levelStatPoints.textContent = parser.stats.pointCount;
+
+            const qcBanner = document.getElementById('levelQcBanner');
+    if (!qcBanner) {
+        // Automatically append banner tracking element container if missing
+        const previewEl = document.getElementById('previewSection');
+        const newBanner = document.createElement('div');
+        newBanner.id = 'levelQcBanner';
+        newBanner.style.marginBottom = '15px';
+        previewEl.insertBefore(newBanner, previewEl.firstChild);
+    }
+    
+    const liveBanner = document.getElementById('levelQcBanner');
+
+    if (parser.calibrationInfo.isCalibration) {
+        const twoPegData = parser.analyze2PegTest();
+        if (twoPegData) {
+            liveBanner.innerHTML = `
+                <div class="status info" style="margin: 0; padding: 15px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: center; border-left: 4px solid #005096; background: var(--card-bg);">
+                    <div>
+                        <h4 style="margin:0 0 8px 0; color: var(--primary);">2-Peg Instrument Calibration Summary</h4>
+                        <table style="width:100%; font-size:11px; margin-bottom:8px; border-collapse:collapse;">
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:4px 0;"><strong>Setup 1 (Mid):</strong></td>
+                                <td style="text-align:right;">A1 Staff: ${twoPegData.A1.reading.toFixed(5)}m</td>
+                                <td style="text-align:right;">B1 Staff: ${twoPegData.B1.reading.toFixed(5)}m</td>
+                                <td style="text-align:right; font-weight:bold;">True ΔH: ${twoPegData.trueDiff.toFixed(5)}m</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:4px 0;"><strong>Setup 2 (End):</strong></td>
+                                <td style="text-align:right;">A2 Staff: ${twoPegData.A2.reading.toFixed(5)}m</td>
+                                <td style="text-align:right;">B2 Staff: ${twoPegData.B2.reading.toFixed(5)}m</td>
+                                <td style="text-align:right; font-weight:bold;">Apparent ΔH: ${twoPegData.apparentDiff.toFixed(5)}m</td>
+                            </tr>
+                        </table>
+                        <span style="font-size:11px; color: var(--text-dim);">Calculated raw field execution deviation: <strong>${(twoPegData.error * 1000).toFixed(2)} mm</strong>.</span>
+                    </div>
+                    <div style="text-align: right; background: rgba(0, 80, 150, 0.08); padding: 12px; border-radius: 4px; border: 1px solid var(--border);">
+                        <div style="font-size: 0.85em; text-transform: uppercase; tracking-spacing: 0.5px; color: var(--text-dim); margin-bottom:2px;">Collimation Angle (α)</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: ${Math.abs(twoPegData.collimationSeconds) > 15 ? '#c62828' : 'var(--text)'};">
+                            ${twoPegData.collimationSeconds > 0 ? '+' : ''}${twoPegData.collimationSeconds.toFixed(1)}"
+                        </div>
+                        <div style="font-size: 0.85em; color: var(--text-dim); font-family:monospace;">(${twoPegData.collimationMmPerM > 0 ? '+' : ''}${twoPegData.collimationMmPerM.toFixed(3)} mm/m)</div>
+                    </div>
+                </div>`;
+            liveBanner.classList.remove('hidden');
+        } else {
+            liveBanner.innerHTML = `
+                <div class="status warning" style="margin: 0; padding: 12px;">
+                    <strong>🔶 Calibration Data Matrix Segregated</strong><br>
+                    Missing records detected. Ensure you have selected exactly 4 structural lines containing all required instrument observation targets (A1, B1, B2, A2) to generate collimation results.
+                </div>`;
+            liveBanner.classList.remove('hidden');
+        }
+    } else {
+        liveBanner.classList.add('hidden');
+    }
 
             // Update toggle button visibility and text (logic is the same)
             if (parser.data.length > 20) {
