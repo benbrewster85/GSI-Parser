@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survey Tools - Linear Coordinate Suite</title>
+    <title>Survey Tools - LCS Conversion Suite</title>
     <link rel="stylesheet" href="../../css/style.css">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <style>
@@ -123,28 +123,35 @@
 
         <!-- Integrated Info section matching your site styling preferences -->
         <div id="aboutSection" class="section hidden">
-            <div class="advanced-content">
-                <p>This utility computes 3D spatial transformations between engineering coordinates and the standard <strong>Linear Code System (LCS)</strong> infrastructure matrix natively within the web client engine.</p>
-                
-                <div class="advanced-grid" style="margin-top: 20px;">
-                    <div class="advanced-group">
-                        <h4>Processing Modes</h4>
-                        <ul>
-                            <li><strong>Coordinates → LCS:</strong> Upload point files containing absolute map coordinates. The tool outputs corresponding LCS values. <b>Input coordingates must be in London Survey Grid (2025) - if your input is in BNG/OSGB we have a tool for that <a href="/tools/coord-converter/">here</a></b></li>
-                            <li><strong>LCS → Coordinates:</strong> Supply standard asset location text strings to reconstruct absolute 3D track positions based on design baseline data profiles (In London Survey grid).</li>
-                        </ul>
-                    </div>
-                    <div class="advanced-group">
-                        <h4>Centerline Projection Feature</h4>
-                        <p>When running coordinate conversions, the tool automatically calculates the true position of the point projected directly back onto the track centreline (E, N, Z)</p>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
-                    <strong>Version:</strong> 2.0 (Client Matrix Sandbox) • <strong>Method:</strong> 3D Parametric Vector Projection
-                </div>
+    <div class="advanced-content">
+        <p>This utility computes 3D spatial transformations between engineering coordinates and the standard <strong>Linear Code System (LCS)</strong> used by Tranport for London for referencing locations and assets on the network.</p>
+        
+        <!-- Open dual column grid layout -->
+        <div class="advanced-grid" style="margin-top: 20px;">
+            <div class="advanced-group">
+                <h4>Processing Modes</h4>
+                <ul>
+                    <li><strong>Coordinates → LCS:</strong> Upload point files containing absolute map coordinates. The tool outputs corresponding LCS values. <b>Input coordinates must be in London Survey Grid (2025) - if your input is in BNG/OSGB we have a tool for that <a href="/tools/coord-converter/">here</a></b></li>
+                    <li><strong>LCS → Coordinates:</strong> Supply standard asset location text strings to reconstruct absolute 3D track positions based on design baseline data profiles (In London Survey grid).</li>
+                </ul>
             </div>
+            <div class="advanced-group">
+                <h4>Centerline Projection Feature</h4>
+                <p>When running coordinate conversions, the tool automatically calculates the true position of the point projected directly back onto the track centreline (E, N, Z)</p>
+            </div>
+        </div> <!-- <-- CRUCIAL: We close the advanced-grid div right here! -->
+        
+        <!-- Now this div runs natively across 100% width of the about card layout container -->
+        <div style="margin-top: 20px;">
+            <p><b>Note:</b> This tool is currently in beta and may contain bugs or limitations. Always check results before using them in production.</p>
         </div>
+            
+        <!-- Break line footer block -->
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+            <strong>Version:</strong> 1.0 (<b>Beta</b>) • <strong>Method:</strong> 3D Parametric Vector Projection
+        </div>
+    </div>
+</div>
 
         <div class="lcs-layout-grid">
             <div class="workspace-card">
