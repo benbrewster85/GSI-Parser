@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - Downloads</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+    <style>
+        .btn-download {
+    display: block;
+    background: #5850ec; /* Sleek purple accent */
+    color: #ffffff !important; /* Forces text white */
+    text-align: center;
+    padding: 12px 20px;
+    border-radius: 8px;
+    text-decoration: none !important; /* Removes default underline */
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: background 0.2s ease;
+    margin-top: auto; /* Pushes button to the bottom of the card */
+}
+
+.btn-download:hover {
+    background: #453dde; /* Darker purple on hover */
+}
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Unified Tools Grid Layout */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 30px;
+        }
+
+        /* Tool Card Architecture */
+        .tool-card {
+            background: #1e1e24; /* Fallback matching common dark UI structures */
+            border: 1px solid #2d2d35;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        /* Hover animation to give desktop feel */
+        .tool-card:hover:not(.coming-soon) {
+            transform: translateY(-2px);
+            border-color: #5850ec; /* Sleek purple highlight accent */
+        }
+
+        /* Metadata Badges */
+        .tool-meta {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-free { background: #1b4332; color: #72efb6; }
+        .badge-platform { background: #2d2d35; color: #a1a1aa; }
+        .badge-future { background: #3f3f46; color: #d4d4d8; }
+
+        .tool-title {
+            margin: 0 0 10px 0;
+            font-size: 1.35rem;
+            color: #f4f4f5;
+        }
+
+        .tool-desc {
+            font-size: 0.95rem;
+            color: #a1a1aa;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            flex-grow: 1;
+        }
+
+        /* Lemon Squeezy Native Button Override */
+        .lemonsqueezy-button.btn-download {
+            display: block;
+            background: #5850ec;
+            color: #ffffff;
+            text-align: center;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: background 0.2s ease;
+        }
+
+        .lemonsqueezy-button.btn-download:hover {
+            background: #453dde;
+        }
+
+        /* Clean styling for future pipeline placeholders */
+        .tool-card.coming-soon {
+            opacity: 0.55;
+            border-style: dashed;
+            background: rgba(30, 30, 36, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">
+                ☰
+            </button>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                <a href="/resources.html" >Resources</a>
+                <a href="/downloads.html" class="nav-active">Downloads</a>
+                <a href="/blog/index.html">Blog & News</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+
+    <div class="container">
+        <main>
+            <div class="local-header" style="margin-bottom: 20px;">
+                <div class="local-header-container">
+                    <h2>Downloads</h2>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="about-content">
+                    <p>Standalone utilities and desktop applications built to streamline geospatial workflows.</p>
+                </div>
+            </div>
+
+            <!-- The Grid Container -->
+            <div class="tools-grid">
+                
+                <!-- Live Product Card -->
+                <div class="tool-card">
+                    <div>
+                        <div class="tool-meta">
+                            <span class="badge badge-free">Free</span>
+                            <span class="badge badge-platform">macOS / Windows</span>
+                        </div>
+                        <h3 class="tool-title">Asset Image Sequencer</h3>
+                        <p class="tool-desc">
+                            A lightweight utility designed to streamline batch renaming of images captured during inspections, surveys, or asset management tasks.
+                        </p>
+                    </div>
+                    <a href="https://surveytools.lemonsqueezy.com/checkout/buy/26acf5d6-39bb-4b96-b896-5723f9e06704" class="btn-download" target="_blank" rel="noopener">
+    Download Utility
+</a>
+                </div>
+
+                <!-- Strategic Placeholder for Next Tool -->
+                <div class="tool-card coming-soon">
+                    <div>
+                        <div class="tool-meta">
+                            <span class="badge badge-future">In Pipeline</span>
+                        </div>
+                        <h3 class="tool-title">Coming Soon</h3>
+                        <p class="tool-desc">
+                            With more ideas than time available to build them - keep watching this space!
+                        </p>
+                    </div>
+                </div>
+
+            </div> 
+
+            <div class="section">
+                <div class="about-content">
+                    <br>
+                    <p><i>Unless otherwise noted, all content is offered for free with the option to "pay what you can". As the only source of income for this website, please consider making a donation.</i></p>
+                </div>
+            </div> 
+        </main>
+        
+        <div class="footer" style="margin-top: 60px;">
+             © Survey Tools 2026
+        </div>
+    </div>
+
+<!-- Cleaned up Script Area -->
+    <script src="../../js/main.js"></script>
+</body>
+</html>
