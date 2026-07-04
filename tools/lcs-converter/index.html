@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - Linear Coordinate Suite</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        /* Tool-Specific Layout Configurations */
+        .lcs-layout-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 500px;
+            margin-bottom: 40px;
+        }
+
+        .workspace-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .mode-toggle-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            background: var(--bg);
+            transition: border-color 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .drop-zone.active {
+            border-color: var(--accent);
+        }
+
+        .table-wrapper {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            padding: 10px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'SF Mono', monospace;
+            color: var(--text-dim);
+        }
+
+        tr:hover td {
+            color: var(--text);
+            background: var(--surface);
+        }
+
+        .results-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            
+            <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">
+                ☰
+            </button>
+
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                <a href="/resources.html">Resources</a>
+                <a href="/blog/index.html">Blog & News</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+
+    <div class="container">
+        
+        <div class="local-header" style="margin-bottom: 20px;">
+            <div class="local-header-container">
+                <h2>Linear Coordinate Suite (LCS)</h2>
+                <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+            </div>
+        </div>
+
+        <!-- Integrated Info section matching your site styling preferences -->
+        <div id="aboutSection" class="section hidden">
+            <div class="advanced-content">
+                <p>This utility computes 3D spatial transformations between engineering coordinates and the standard <strong>Linear Code System (LCS)</strong> infrastructure matrix natively within the web client engine.</p>
+                
+                <div class="advanced-grid" style="margin-top: 20px;">
+                    <div class="advanced-group">
+                        <h4>Processing Modes</h4>
+                        <ul>
+                            <li><strong>Coordinates → LCS:</strong> Upload point files containing absolute map coordinates. The geometry loop calculates bounding boxes to auto-detect line codes, extracting exact chainages and 3D offsets.</li>
+                            <li><strong>LCS → Coordinates:</strong> Supply standard asset location text strings to reconstruct absolute 3D track positions based on design baseline data profiles.</li>
+                        </ul>
+                    </div>
+                    <div class="advanced-group">
+                        <h4>Centerline Projection Feature</h4>
+                        <p>When running coordinate conversions, the tool automatically calculates the true position parameters of the point projected orthogonally directly back down onto the line axis center datum profile ($E, N, Z$), simplifying track clearance measurements.</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+                    <strong>Version:</strong> 2.0 (Client Matrix Sandbox) • <strong>Method:</strong> 3D Parametric Vector Projection
+                </div>
+            </div>
+        </div>
+
+        <div class="lcs-layout-grid">
+            <div class="workspace-card">
+                
+                <div class="mode-toggle-bar">
+                    <button class="btn primary" id="btnCoord" onclick="setMode('COORD_TO_LCS')">Coordinates → LCS (Auto-Detect)</button>
+                    <button class="btn" id="btnLcs" onclick="setMode('LCS_TO_COORD')" style="background:var(--surface); border:1px solid var(--border);">LCS → Coordinates</button>
+                </div>
+
+                <div class="drop-zone">
+                    <p id="statusTxt" style="font-size: 14px; margin-bottom: 15px; color: var(--text);">Loading track alignment matrix layers into browser memory...</p>
+                    <input type="file" id="csvFileInput" accept=".csv" disabled style="font-size: 13px;">
+                </div>
+
+                <div class="help-text">
+                    <p>• <strong>Expected Headers:</strong> <span id="colsTxt" style="font-family:monospace; color:var(--accent);">PointID, Easting, Northing, Elevation</span></p>
+                    <p>• Heavy calculation loops execute isolated completely within local browser thread allocations.</p>
+                </div>
+            </div>
+
+            <!-- Interrogate Matrix Display Output Block -->
+            <div class="workspace-card hidden" id="resultsCard">
+                <div class="results-header-actions">
+                    <h3 style="font-size: 16px; margin: 0;" id="recordsCountTxt">Processed Records</h3>
+                    <button class="btn primary" onclick="exportDataGrid()">💾 Export Clean CSV</button>
+                </div>
+                
+                <div class="table-wrapper">
+                    <table id="datagrid">
+                        <thead id="datagridHead"></thead>
+                        <tbody id="datagridBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="footer">
+        © Survey Tools 2026
+    </div>
+
+    <!-- Wire straight into your main layout initialization logic scripts -->
+    <script src="../../js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="lcs-engine.js"></script>
+    <script>
+        let networkData = null;
+        let activeMode = 'COORD_TO_LCS';
+        let latestProcessedData = [];
+
+        // Simple toggle for the About section
+        document.getElementById('aboutBtn').addEventListener('click', function() {
+            document.getElementById('aboutSection').classList.toggle('hidden');
+        });
+
+        // Initialize and fetch data framework mapping
+        fetch('/data/master_track_network.json')
+            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+            .then(data => {
+                networkData = data;
+                document.getElementById('statusTxt').innerText = '✓ 3D Alignment layers cached in RAM. Ready for data processing.';
+                document.getElementById('csvFileInput').disabled = false;
+            })
+            .catch(() => {
+                document.getElementById('statusTxt').innerText = '❌ Error: Failed to find master_track_network.json inside /data/ folder directory.';
+            });
+
+        function setMode(mode) {
+            activeMode = mode;
+            const btnC = document.getElementById('btnCoord');
+            const btnL = document.getElementById('btnLcs');
+            const cols = document.getElementById('colsTxt');
+            
+            // Clear current working tables on swap
+            document.getElementById('resultsCard').classList.add('hidden');
+            latestProcessedData = [];
+
+            if(mode === 'COORD_TO_LCS') {
+                btnC.className = "btn primary"; btnC.style = "";
+                btnL.className = "btn"; btnL.style = "background:var(--surface); border:1px solid var(--border);";
+                cols.innerText = 'PointID, Easting, Northing, Elevation';
+            } else {
+                btnL.className = "btn primary"; btnL.style = "";
+                btnC.className = "btn"; btnC.style = "background:var(--surface); border:1px solid var(--border);";
+                cols.innerText = 'PointID, LCS_Code';
+            }
+        }
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file || !networkData) return;
+
+            document.getElementById('statusTxt').innerText = 'Executing 3D spatial geometry transformations...';
+            const startTime = performance.now();
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    try {
+                        const rows = results.data;
+                        latestProcessedData = [];
+
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            const cleanRow = {};
+                            Object.keys(row).forEach(k => cleanRow[k.toLowerCase().trim()] = String(row[k]).trim());
+                            const pointId = cleanRow.pointid || i.toString();
+
+                            if (activeMode === 'COORD_TO_LCS') {
+                                const easting = parseFloat(cleanRow.easting || cleanRow.east || cleanRow.x || '');
+                                const northing = parseFloat(cleanRow.northing || cleanRow.north || cleanRow.y || '');
+                                const elevation = parseFloat(cleanRow.elevation || cleanRow.el || cleanRow.z || '0');
+
+                                if (isNaN(easting) || isNaN(northing)) {
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Bad coordinate string conversion' });
+                                    continue;
+                                }
+
+                                try {
+                                    const match = findGlobal3DMatch(networkData, easting, northing, elevation);
+                                    const preciseM = match.chainage.toFixed(3);
+                                    const formattedOffset = match.horizontalOffset.toFixed(3);
+                                    
+                                    const zeroOffsetLcs = `${match.assetPrefix}-${preciseM}-${match.direction}0.000`;
+                                    const centerline = findCoordinatesFromLCS(networkData, zeroOffsetLcs);
+
+                                    latestProcessedData.push({
+                                        PointID: pointId,
+                                        Track_Prefix: match.assetPrefix,
+                                        L2_4_LCS: `${match.assetPrefix}-${Math.round(match.chainage)}`,
+                                        Full_LCS_String: `${match.assetPrefix}-${preciseM}-${match.direction}${formattedOffset}`,
+                                        Chainage: preciseM,
+                                        Offset_H: formattedOffset,
+                                        Offset_V: match.verticalOffset.toFixed(3),
+                                        Centerline_E: centerline.easting.toFixed(3),
+                                        Centerline_N: centerline.northing.toFixed(3),
+                                        Centerline_Z: centerline.elevation.toFixed(3)
+                                    });
+                                } catch(err) {
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Outside network boundary' });
+                                }
+                            } else {
+                                const lcsCode = cleanRow.lcs_code || cleanRow.lcs;
+                                if (!lcsCode) {
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Missing column values' });
+                                    continue;
+                                }
+                                try {
+                                    const geom = findCoordinatesFromLCS(networkData, lcsCode);
+                                    latestProcessedData.push({
+                                        PointID: pointId,
+                                        LCS_Code: lcsCode,
+                                        Line_Match: geom.assetPrefix,
+                                        Easting: geom.easting.toFixed(3),
+                                        Northing: geom.northing.toFixed(3),
+                                        Elevation: geom.elevation.toFixed(3)
+                                    });
+                                } catch(err) {
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Parsing structure fault' });
+                                }
+                            }
+                        }
+
+                        renderTable();
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+                        document.getElementById('statusTxt').innerText = `✓ Calculation array complete. Processed ${rows.length} rows in ${duration}s.`;
+                    } catch(err) {
+                        document.getElementById('statusTxt').innerText = `❌ Operational fault: ${err.message}`;
+                    }
+                }
+            });
+        });
+
+        function renderTable() {
+            const head = document.getElementById('datagridHead');
+            const body = document.getElementById('datagridBody');
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            if (latestProcessedData.length === 0) return;
+
+            // Render Header row from keys
+            const keys = Object.keys(latestProcessedData[0]);
+            let headHtml = '<tr>';
+            keys.forEach(k => headHtml += `<th>${k.replace(/_/g, ' ')}</th>`);
+            headHtml += '</tr>';
+            head.innerHTML = headHtml;
+
+            // Render data contents rows
+            latestProcessedData.forEach(row => {
+                let rowHtml = '<tr>';
+                keys.forEach(k => rowHtml += `<td>${row[k]}</td>`);
+                rowHtml += '</tr>';
+                body.innerHTML += rowHtml;
+            });
+
+            document.getElementById('recordsCountTxt').innerText = `Processed Records (${latestProcessedData.length} items)`;
+            document.getElementById('resultsCard').classList.remove('hidden');
+        }
+
+        function exportDataGrid() {
+            if (latestProcessedData.length === 0) return;
+            const csv = Papa.unparse(latestProcessedData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `lcs_export_${Date.now()}.csv`);
+            link.click();
+        }
+    </script>
+</body>
+</html>
