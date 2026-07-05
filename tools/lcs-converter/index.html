@@ -455,7 +455,6 @@
             if (!networkData) return [];
             const lines = new Set();
             Object.keys(networkData).forEach(prefix => {
-                // If it looks like CEN-EB, line is CEN. If it looks like B043-B-UPLO, line is B043.
                 const parts = prefix.split('-');
                 if (parts[0]) lines.add(parts[0].toUpperCase());
             });
@@ -488,23 +487,28 @@
                 lastPrefix = lastRow.querySelector('.b-prefix').value;
                 lastDir = lastRow.querySelector('.b-dir').value;
             } else {
-                // Default fallback to the first line category in alphabetical order
                 const categories = getLineCategories();
                 lastLine = categories[0] || "";
             }
 
+            // --- UPDATED: Construct the Line Category options with appended names ---
             const lineOptionsHTML = getLineCategories()
-                .map(l => `<option value="${l}">${l}</option>`)
+                .map(l => {
+                    // Look up the name from the master Excel-derived JSON data
+                    const description = lcsNamesData[l] ? ` - ${lcsNamesData[l]}` : "";
+                    return `<option value="${l}">${l}${description}</option>`;
+                })
                 .join('');
+            // ------------------------------------------------------------------------
 
             tr.innerHTML = `
                 <td>
-                    <select class="b-line" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                    <select class="b-line" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
                         ${lineOptionsHTML}
                     </select>
                 </td>
                 <td>
-                    <select class="b-prefix" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                    <select class="b-prefix" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
                         ${getFilteredTracksHTML(lastLine)}
                     </select>
                 </td>
@@ -520,7 +524,6 @@
                 <td><button class="btn small" onclick="this.parentElement.parentElement.remove()" style="padding:4px 8px; background:red; color:white; border:none; border-radius:4px; cursor:pointer;">X</button></td>
             `;
 
-            // Wire up immediate change updates to trigger cascading filter refreshes
             const lineSelect = tr.querySelector('.b-line');
             const trackSelect = tr.querySelector('.b-prefix');
             
