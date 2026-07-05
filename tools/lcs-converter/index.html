@@ -116,7 +116,7 @@
         
         <div class="local-header" style="margin-bottom: 20px;">
             <div class="local-header-container">
-                <h2>Linear Coordinate Suite (LCS)</h2>
+                <h2>LCS Conversion Utility</h2>
                 <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
             </div>
         </div>
@@ -124,7 +124,7 @@
         <!-- Integrated Info section matching your site styling preferences -->
         <div id="aboutSection" class="section hidden">
     <div class="advanced-content">
-        <p>This utility computes 3D spatial transformations between engineering coordinates and the standard <strong>Linear Code System (LCS)</strong> used by Tranport for London for referencing locations and assets on the network.</p>
+        <p>This tool computes 3D spatial transformations between cartesian coordinates (LSG2025) and the standard <strong>Linear Code System (LCS)</strong> used by Tranport for London for referencing locations and assets on the network.</p>
         
         <!-- Open dual column grid layout -->
         <div class="advanced-grid" style="margin-top: 20px;">
@@ -138,6 +138,10 @@
             <div class="advanced-group">
                 <h4>Centerline Projection Feature</h4>
                 <p>When running coordinate conversions, the tool automatically calculates the true position of the point projected directly back onto the track centreline (E, N, Z)</p>
+            </div>
+            <div class="advanced-group">
+                <h4>LCS Builder Feature</h4>
+                <p>The LCS Builder allows users to manually create LCS entries for conversion to LSG coordinates. Beware the lack of a save function if building multiple entries.</p>
             </div>
         </div> <!-- <-- CRUCIAL: We close the advanced-grid div right here! -->
         
@@ -157,19 +161,48 @@
             <div class="workspace-card">
                 
                 <div class="mode-toggle-bar">
-                    <button class="btn primary" id="btnCoord" onclick="setMode('COORD_TO_LCS')">Coordinates → LCS (Auto-Detect)</button>
-                    <button class="btn" id="btnLcs" onclick="setMode('LCS_TO_COORD')" style="background:var(--surface); border:1px solid var(--border);">LCS → Coordinates</button>
-                </div>
+    <button class="btn primary" id="btnCoord" onclick="setMode('COORD_TO_LCS')">Coordinates → LCS (Auto-Detect)</button>
+    <button class="btn" id="btnLcs" onclick="setMode('LCS_TO_COORD')" style="background:var(--surface); border:1px solid var(--border);">LCS → Coordinates</button>
+    <button class="btn" id="btnBuilder" onclick="setMode('LCS_BUILDER')" style="background:var(--surface); border:1px solid var(--border);">🧱 LCS Builder</button>
+</div>
 
                 <div class="drop-zone">
                     <p id="statusTxt" style="font-size: 14px; margin-bottom: 15px; color: var(--text);">Loading track alignment matrix layers into browser memory...</p>
                     <input type="file" id="csvFileInput" accept=".csv" disabled style="font-size: 13px;">
                 </div>
 
+                <!-- Interactive LCS Builder Panel -->
+<div id="builderZone" class="workspace-card hidden" style="margin-top: 20px;">
+    <h3 style="font-size: 16px; margin-bottom: 15px;">Manual LCS Builder</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; min-width: 700px;">
+            <thead>
+    <tr>
+        <th style="width: 140px;">Line Category</th>
+        <th style="width: 160px;">Track Section (Prefix)</th>
+        <th>Chainage (m)</th>
+        <th style="width: 75px;">Side</th>
+        <th>Horiz. Offset (m)</th>
+        <th>Vert. Offset (m)</th>
+        <th style="width: 50px;">Action</th>
+    </tr>
+</thead>
+            <tbody id="builderRowsBody">
+                <!-- Javascript dynamically injects rows here -->
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top: 15px; display: flex; gap: 10px;">
+        <button class="btn" onclick="addBuilderRow()" style="background: var(--bg); border: 1px solid var(--border);">+ Add Row</button>
+        <button class="btn primary" onclick="processBuilderRows()">⚡ Calculate Coordinates</button>
+    </div>
+</div>
+
                 <div class="help-text">
-                    <p>• <strong>Expected Headers:</strong> <span id="colsTxt" style="font-family:monospace; color:var(--accent);">PointID, Easting, Northing, Elevation</span></p>
-                    <p>• Heavy calculation loops execute isolated completely within local browser thread allocations.</p>
-                </div>
+                    <br>
+    <p>• <strong>Required Position Order (No Headers):</strong> <span id="colsTxt" style="font-family:monospace; color:var(--accent);">[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation</span></p>
+    <p>• Heavy calculation loops execute isolated completely within local browser thread allocations.</p>
+</div>
             </div>
 
             <!-- Interrogate Matrix Display Output Block -->
@@ -213,7 +246,7 @@
             .then(res => { if (!res.ok) throw new Error(); return res.json(); })
             .then(data => {
                 networkData = data;
-                document.getElementById('statusTxt').innerText = '✓ 3D Alignment layers cached in RAM. Ready for data processing.';
+                document.getElementById('statusTxt').innerText = '✓ 3D Centrelines Loaded. Ready for data processing.';
                 document.getElementById('csvFileInput').disabled = false;
             })
             .catch(() => {
@@ -224,20 +257,35 @@
             activeMode = mode;
             const btnC = document.getElementById('btnCoord');
             const btnL = document.getElementById('btnLcs');
+            const btnB = document.getElementById('btnBuilder');
             const cols = document.getElementById('colsTxt');
+            const dropZone = document.querySelector('.drop-zone');
+            const builderZone = document.getElementById('builderZone');
             
-            // Clear current working tables on swap
             document.getElementById('resultsCard').classList.add('hidden');
             latestProcessedData = [];
 
-            if(mode === 'COORD_TO_LCS') {
+            // Reset tab button states
+            [btnC, btnL, btnB].forEach(b => {
+                b.className = "btn";
+                b.style = "background:var(--surface); border:1px solid var(--border);";
+            });
+
+            if (mode === 'COORD_TO_LCS') {
                 btnC.className = "btn primary"; btnC.style = "";
-                btnL.className = "btn"; btnL.style = "background:var(--surface); border:1px solid var(--border);";
-                cols.innerText = 'PointID, Easting, Northing, Elevation';
-            } else {
+                dropZone.style.display = "block"; builderZone.classList.add('hidden');
+                cols.innerText = '[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation';
+            } else if (mode === 'LCS_TO_COORD') {
                 btnL.className = "btn primary"; btnL.style = "";
-                btnC.className = "btn"; btnC.style = "background:var(--surface); border:1px solid var(--border);";
-                cols.innerText = 'PointID, LCS_Code';
+                dropZone.style.display = "block"; builderZone.classList.add('hidden');
+                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code';
+            } else {
+                btnB.className = "btn primary"; btnB.style = "";
+                dropZone.style.display = "none"; builderZone.classList.remove('hidden');
+                // Prime the builder with its first row if empty
+                if (document.getElementById('builderRowsBody').children.length === 0) {
+                    addBuilderRow();
+                }
             }
         }
 
@@ -249,7 +297,7 @@
             const startTime = performance.now();
 
             Papa.parse(file, {
-                header: true,
+                header: false, // <-- Disable header mapping to process raw rows
                 skipEmptyLines: true,
                 complete: function(results) {
                     try {
@@ -257,18 +305,21 @@
                         latestProcessedData = [];
 
                         for (let i = 0; i < rows.length; i++) {
-                            const row = rows[i];
-                            const cleanRow = {};
-                            Object.keys(row).forEach(k => cleanRow[k.toLowerCase().trim()] = String(row[k]).trim());
-                            const pointId = cleanRow.pointid || i.toString();
+                            const row = Object.values(rows[i]); // Convert row to array values
+                            
+                            // Skip processing if row is malformed or empty
+                            if (row.length < 2) continue;
+
+                            const pointId = String(row[0]).trim() || i.toString();
 
                             if (activeMode === 'COORD_TO_LCS') {
-                                const easting = parseFloat(cleanRow.easting || cleanRow.east || cleanRow.x || '');
-                                const northing = parseFloat(cleanRow.northing || cleanRow.north || cleanRow.y || '');
-                                const elevation = parseFloat(cleanRow.elevation || cleanRow.el || cleanRow.z || '0');
+                                // Extract properties strictly by index location
+                                const easting = parseFloat(String(row[1]).trim());
+                                const northing = parseFloat(String(row[2]).trim());
+                                const elevation = row[3] ? parseFloat(String(row[3]).trim()) : 0;
 
                                 if (isNaN(easting) || isNaN(northing)) {
-                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Bad coordinate string conversion' });
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Non-numeric coordinate values detected' });
                                     continue;
                                 }
 
@@ -296,23 +347,35 @@
                                     latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Outside network boundary' });
                                 }
                             } else {
-                                const lcsCode = cleanRow.lcs_code || cleanRow.lcs;
-                                if (!lcsCode) {
-                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Missing column values' });
+                                // Mode B: Map to column 1, and optional Vertical Offset to column 2
+                                const lcsCode = String(row[1]).trim();
+                                
+                                // Safely extract the optional vertical offset, defaulting to 0 if blank
+                                const rawOffV = row[2] ? parseFloat(String(row[2]).trim()) : 0;
+                                const offV = isNaN(rawOffV) ? 0 : rawOffV;
+
+                                if (!lcsCode || lcsCode === 'undefined') {
+                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Blank LCS data value' });
                                     continue;
                                 }
+
                                 try {
                                     const geom = findCoordinatesFromLCS(networkData, lcsCode);
+                                    
+                                    // Apply the vertical adjustment to the baseline track profile
+                                    const absoluteElevation = geom.elevation + offV;
+
                                     latestProcessedData.push({
                                         PointID: pointId,
                                         LCS_Code: lcsCode,
+                                        Vert_Offset: offV.toFixed(3),
                                         Line_Match: geom.assetPrefix,
                                         Easting: geom.easting.toFixed(3),
                                         Northing: geom.northing.toFixed(3),
-                                        Elevation: geom.elevation.toFixed(3)
+                                        Elevation: absoluteElevation.toFixed(3)
                                     });
                                 } catch(err) {
-                                    latestProcessedData.push({ PointID: pointId, Status: 'ERROR: Parsing structure fault' });
+                                    latestProcessedData.push({ PointID: pointId, Status: `ERROR: ${err.message}` });
                                 }
                             }
                         }
@@ -363,6 +426,138 @@
             link.href = url;
             link.setAttribute('download', `lcs_export_${Date.now()}.csv`);
             link.click();
+        }
+
+        // 1. Group track prefixes into parent Line Categories dynamically
+        function getLineCategories() {
+            if (!networkData) return [];
+            const lines = new Set();
+            Object.keys(networkData).forEach(prefix => {
+                // If it looks like CEN-EB, line is CEN. If it looks like B043-B-UPLO, line is B043.
+                const parts = prefix.split('-');
+                if (parts[0]) lines.add(parts[0].toUpperCase());
+            });
+            return Array.from(lines).sort();
+        }
+
+        // 2. Generate Track options filtered strictly by the active parent line
+        function getFilteredTracksHTML(targetLine) {
+            if (!networkData) return '<option value="">No Data</option>';
+            return Object.keys(networkData)
+                .filter(prefix => prefix.toUpperCase().startsWith(targetLine.toUpperCase()))
+                .sort()
+                .map(prefix => `<option value="${prefix}">${prefix}</option>`)
+                .join('');
+        }
+
+        // 3. Append entry row with automatic dropdown cascade filtering
+        function addBuilderRow() {
+            const tbody = document.getElementById('builderRowsBody');
+            const rowCount = tbody.children.length;
+            const tr = document.createElement('tr');
+
+            // Inherit operational settings from the row immediately above
+            let lastLine = "";
+            let lastPrefix = "";
+            let lastDir = "L";
+            if (rowCount > 0) {
+                const lastRow = tbody.lastElementChild;
+                lastLine = lastRow.querySelector('.b-line').value;
+                lastPrefix = lastRow.querySelector('.b-prefix').value;
+                lastDir = lastRow.querySelector('.b-dir').value;
+            } else {
+                // Default fallback to the first line category in alphabetical order
+                const categories = getLineCategories();
+                lastLine = categories[0] || "";
+            }
+
+            const lineOptionsHTML = getLineCategories()
+                .map(l => `<option value="${l}">${l}</option>`)
+                .join('');
+
+            tr.innerHTML = `
+                <td>
+                    <select class="b-line" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                        ${lineOptionsHTML}
+                    </select>
+                </td>
+                <td>
+                    <select class="b-prefix" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                        ${getFilteredTracksHTML(lastLine)}
+                    </select>
+                </td>
+                <td><input type="number" step="0.001" class="b-chainage" placeholder="e.g. 1142.500" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                <td>
+                    <select class="b-dir" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                        <option value="L">L</option>
+                        <option value="R">R</option>
+                    </select>
+                </td>
+                <td><input type="number" step="0.001" class="b-offset" placeholder="e.g. 1.250" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                <td><input type="number" step="0.001" class="b-voffset" placeholder="e.g. 0.350" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                <td><button class="btn small" onclick="this.parentElement.parentElement.remove()" style="padding:4px 8px; background:red; color:white; border:none; border-radius:4px; cursor:pointer;">X</button></td>
+            `;
+
+            // Wire up immediate change updates to trigger cascading filter refreshes
+            const lineSelect = tr.querySelector('.b-line');
+            const trackSelect = tr.querySelector('.b-prefix');
+            
+            lineSelect.addEventListener('change', function() {
+                trackSelect.innerHTML = getFilteredTracksHTML(lineSelect.value);
+            });
+
+            tbody.appendChild(tr);
+
+            // Apply inherited selection state
+            lineSelect.value = lastLine;
+            trackSelect.innerHTML = getFilteredTracksHTML(lastLine);
+            if (lastPrefix) trackSelect.value = lastPrefix;
+            tr.querySelector('.b-dir').value = lastDir;
+        }
+
+        // 4. Transform builder field parameters into absolute coordinates
+        function processBuilderRows() {
+            const rows = document.getElementById('builderRowsBody').children;
+            latestProcessedData = [];
+
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                const prefix = r.querySelector('.b-prefix').value;
+                const chVal = parseFloat(r.querySelector('.b-chainage').value);
+                const dir = r.querySelector('.b-dir').value;
+                const offH = parseFloat(r.querySelector('.b-offset').value || '0');
+                const offV = parseFloat(r.querySelector('.b-voffset').value || '0');
+
+                if (!prefix || isNaN(chVal)) {
+                    latestProcessedData.push({ PointID: `Row-${i+1}`, Status: 'ERROR: Missing required Chainage metric parameter values' });
+                    continue;
+                }
+
+                // Construct baseline geometric string properties
+                const builtLcsCode = `${prefix}-${chVal.toFixed(3)}-${dir}${offH.toFixed(3)}`;
+
+                try {
+                    const geom = findCoordinatesFromLCS(networkData, builtLcsCode);
+                    
+                    // Incorporate explicit Z vertical offset factor calculation adjustments directly
+                    const absoluteElevation = geom.elevation + offV;
+
+                    latestProcessedData.push({
+                        PointID: `Point-${i+1}`,
+                        Built_LCS_String: builtLcsCode,
+                        Vert_Offset: offV.toFixed(3),
+                        Matched_Track: geom.assetPrefix,
+                        Easting: geom.easting.toFixed(3),
+                        Northing: geom.northing.toFixed(3),
+                        Elevation: absoluteElevation.toFixed(3) // <-- Output reflects track baseline profile adjusted by Z offset
+                    });
+                } catch(err) {
+                    latestProcessedData.push({ PointID: `Row-${i+1}`, Status: `ERROR: Calculation boundary exception` });
+                }
+            }
+
+            renderTable();
+            document.getElementById('statusTxt').innerText = `✓ Vector transformations calculated successfully. View results grid dataset matrix parameters below.`;
         }
     </script>
 </body>

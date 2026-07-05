@@ -97,10 +97,23 @@ function findCoordinatesFromLCS(networkData, lcsCode) {
     const track = networkData[assetPrefix];
     if (!track) throw new Error(`Track prefix not found: ${assetPrefix}`);
 
+    // --- NEW GUARDRAIL: Extrapolation Blocker ---
+    const minM = track[0].m;
+    const maxM = track[track.length - 1].m;
+    
+    // We include a 1mm (0.001) tolerance to prevent false flags on floating-point rounding
+    if (targetM < minM - 0.001 || targetM > maxM + 0.001) {
+        throw new Error(`Chainage ${targetM.toFixed(3)} is out of bounds. Valid limits: ${minM.toFixed(3)} to ${maxM.toFixed(3)}`);
+    }
+    // --------------------------------------------
+
     let lowIdx = 0, highIdx = track.length - 1;
-    if (targetM <= track[lowIdx].m) highIdx = 1;
-    else if (targetM >= track[highIdx].m) lowIdx = track.length - 2;
-    else {
+    
+    if (targetM <= track[lowIdx].m) {
+        highIdx = 1;
+    } else if (targetM >= track[highIdx].m) {
+        lowIdx = track.length - 2;
+    } else {
         while (highIdx - lowIdx > 1) {
             const mid = Math.floor((lowIdx + highIdx) / 2);
             if (track[mid].m <= targetM) lowIdx = mid;
