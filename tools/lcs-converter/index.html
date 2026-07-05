@@ -232,8 +232,99 @@
     <!-- Wire straight into your main layout initialization logic scripts -->
     <script src="../../js/main.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="lcs-engine.js"></script>
     <script>
+        // ====================================================================
+        // EMBEDDED GEOMETRY ENGINE FUNCTIONS (Bypasses external file 404s)
+        // ====================================================================
+        function findCoordinatesFromLCS(networkData, lcsCode) {
+            const regex = /^([A-Za-z0-9\-]+?)-(\d+(?:\.\d+)?)-([LRlr])(\d+(?:\.\d+)?)$/;
+            const match = lcsCode.trim().match(regex);
+            if (!match) throw new Error("Invalid LCS format syntax.");
+            
+            const assetPrefix = match[1];
+            const targetM = parseFloat(match[2]);
+            const direction = match[3].toUpperCase();
+            const offsetH = parseFloat(match[4]);
+
+            const track = networkData[assetPrefix];
+            if (!track) throw new Error(`Track prefix not found: ${assetPrefix}`);
+
+            const minM = track[0].m;
+            const maxM = track[track.length - 1].m;
+            
+            if (targetM < minM - 0.001 || targetM > maxM + 0.001) {
+                throw new Error(`Chainage ${targetM.toFixed(3)} out of bounds (${minM.toFixed(1)} to ${maxM.toFixed(1)})`);
+            }
+
+            let lowIdx = 0, highIdx = track.length - 1;
+            while (highIdx - lowIdx > 1) {
+                const mid = Math.floor((lowIdx + highIdx) / 2);
+                if (track[mid].m <= targetM) lowIdx = mid; else highIdx = mid;
+            }
+
+            const p1 = track[lowIdx], p2 = track[highIdx];
+            const segLenM = p2.m - p1.m;
+            const factor = segLenM === 0 ? 0 : (targetM - p1.m) / segLenM;
+
+            const centerE = p1.e + factor * (p2.e - p1.e);
+            const centerN = p1.n + factor * (p2.n - p1.n);
+            const centerZ = p1.z + factor * (p2.z - p1.z);
+
+            const headingNorm = Math.hypot(p2.e - p1.e, p2.n - p1.n);
+            const sign = direction === "L" ? 1 : -1;
+
+            return {
+                assetPrefix,
+                chainage: targetM,
+                easting: centerE + (-((p2.n - p1.n) / headingNorm) * sign) * offsetH,
+                northing: centerN + (((p2.e - p1.e) / headingNorm) * sign) * offsetH,
+                elevation: centerZ
+            };
+        }
+
+        function findGlobal3DMatch(networkData, e, n, z) {
+            let bestMatch = null;
+            let minDistance = Infinity;
+
+            Object.entries(networkData).forEach(([prefix, trackArray]) => {
+                for (let i = 0; i < trackArray.length - 1; i++) {
+                    const p1 = trackArray[i];
+                    const p2 = trackArray[i+1];
+
+                    const ve = p2.e - p1.e;
+                    const vn = p2.n - p1.n;
+                    const segLenSq = ve*ve + vn*vn;
+                    if (segLenSq === 0) continue;
+
+                    const we = e - p1.e;
+                    const wn = n - p1.n;
+                    let t = Math.max(0, Math.min(1, (we*ve + wn*vn) / segLenSq));
+
+                    const projE = p1.e + t*ve;
+                    const projN = p1.n + t*vn;
+                    const dist = Math.hypot(e - projE, n - projN);
+
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        const projZ = p1.z + t*(p2.z - p1.z);
+                        const cross = (ve * wn) - (vn * we);
+                        const direction = cross >= 0 ? "L" : "R";
+                        const chainage = p1.m + t * Math.sqrt(segLenSq);
+
+                        bestMatch = {
+                            assetPrefix: prefix,
+                            chainage: chainage,
+                            horizontalOffset: dist,
+                            verticalOffset: z - projZ,
+                            direction: direction
+                        };
+                    }
+                }
+            });
+
+            if (!bestMatch) throw new Error("No alignment track match found.");
+            return bestMatch;
+        }
         let networkData = null;
         let lcsNamesData = {};
         let activeMode = 'COORD_TO_LCS';
@@ -376,21 +467,27 @@
                                     // Apply the vertical adjustment to the baseline track profile
                                     const absoluteElevation = geom.elevation + offV;
 
-                                    const signedOffsetH = dir === "L" ? `-${offH.toFixed(3)}` : `${offH.toFixed(3)}`;
+                                    // Correctly extract the Side and H-Offset from the code string itself
+                                    const regex = /-([LRlr])(\d+(?:\.\d+)?)$/;
+                                    const matchH = lcsCode.match(regex);
+                                    const sideStr = matchH ? matchH[1].toUpperCase() : "L";
+                                    const valH = matchH ? parseFloat(matchH[2]) : 0;
+                                    
+                                    // Apply our clean signed notation rule
+                                    const signedOffsetH = sideStr === "L" ? `-${valH.toFixed(3)}` : `${valH.toFixed(3)}`;
 
-                    latestProcessedData.push({
-                        PointID: `Point-${i+1}`,
-                        Built_LCS_String: builtLcsCode,
-                        Location_Name: getLcsLocationDescription(prefix),
-                        Chainage: chVal.toFixed(3),
-                        Offset_H: signedOffsetH, // <-- Signed value output
-                        Offset_V: offV.toFixed(3),
-                        Matched_Track: geom.assetPrefix,
-                        Easting: geom.easting.toFixed(3),
-                        Northing: geom.northing.toFixed(3),
-                        Elevation: absoluteElevation.toFixed(3)
-                    });
-                } catch(err) {
+                                    latestProcessedData.push({
+                                        PointID: pointId,
+                                        LCS_Code: lcsCode,
+                                        Location_Name: getLcsLocationDescription(geom.assetPrefix),
+                                        Offset_H: signedOffsetH,
+                                        Vert_Offset: offV.toFixed(3),
+                                        Line_Match: geom.assetPrefix,
+                                        Easting: geom.easting.toFixed(3),
+                                        Northing: geom.northing.toFixed(3),
+                                        Elevation: absoluteElevation.toFixed(3)
+                                    });
+                                } catch(err) {
                                     latestProcessedData.push({ PointID: pointId, Status: `ERROR: ${err.message}` });
                                 }
                             }
