@@ -124,26 +124,27 @@
         <!-- Integrated Info section matching your site styling preferences -->
         <div id="aboutSection" class="section hidden">
     <div class="advanced-content">
-        <p>This tool computes 3D spatial transformations between cartesian coordinates (LSG2025) and the standard <strong>Linear Code System (LCS)</strong> used by Tranport for London for referencing locations and assets on the network.</p>
+        <p>This tool computes 3D spatial transformations between cartesian coordinates (LSG2025) and the standard <strong>Linear Code System (LCS)</strong> used by Tranport for London for referencing locations and assets on the network. Details of the LCS system can be found in the TfL Standard S1035</p>
         
         <!-- Open dual column grid layout -->
         <div class="advanced-grid" style="margin-top: 20px;">
             <div class="advanced-group">
                 <h4>Processing Modes</h4>
                 <ul>
-                    <li><strong>Coordinates → LCS:</strong> Upload point files containing absolute map coordinates. The tool outputs corresponding LCS values. <b>Input coordinates must be in London Survey Grid (2025) - if your input is in BNG/OSGB we have a tool for that <a href="/tools/coord-converter/">here</a></b></li>
+                    <li><strong>Coordinates → LCS:</strong> Upload point files containing absolute map coordinates. The tool outputs corresponding LCS values. <b>Input coordinates must be in London Survey Grid (2025) - if your input is in BNG/OSGB we have a tool for that <a href="/tools/coord-converter/">here</a></b></li><br>
                     <li><strong>LCS → Coordinates:</strong> Supply standard asset location text strings to reconstruct absolute 3D track positions based on design baseline data profiles (In London Survey grid).</li>
                 </ul>
             </div>
             <div class="advanced-group">
                 <h4>Centerline Projection Feature</h4>
                 <p>When running coordinate conversions, the tool automatically calculates the true position of the point projected directly back onto the track centreline (E, N, Z)</p>
-            </div>
+            <br>
             <div class="advanced-group">
                 <h4>LCS Builder Feature</h4>
                 <p>The LCS Builder allows users to manually create LCS entries for conversion to LSG coordinates. Beware the lack of a save function if building multiple entries.</p>
             </div>
-        </div> <!-- <-- CRUCIAL: We close the advanced-grid div right here! -->
+            </div>
+        </div> 
         
         <!-- Now this div runs natively across 100% width of the about card layout container -->
         <div style="margin-top: 20px;">
@@ -233,6 +234,7 @@
     <script src="lcs-engine.js"></script>
     <script>
         let networkData = null;
+        let lcsNamesData = {};
         let activeMode = 'COORD_TO_LCS';
         let latestProcessedData = [];
 
@@ -242,16 +244,19 @@
         });
 
         // Initialize and fetch data framework mapping
-        fetch('/data/master_track_network.json')
-            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-            .then(data => {
-                networkData = data;
-                document.getElementById('statusTxt').innerText = '✓ 3D Centrelines Loaded. Ready for data processing.';
-                document.getElementById('csvFileInput').disabled = false;
-            })
-            .catch(() => {
-                document.getElementById('statusTxt').innerText = '❌ Error: Failed to find master_track_network.json inside /data/ folder directory.';
-            });
+        Promise.all([
+            fetch('/data/master_track_network.json').then(res => { if(!res.ok) throw Error(); return res.json(); }),
+            fetch('/data/lcs_descriptions.json').then(res => { if(!res.ok) throw Error(); return res.json(); })
+        ])
+        .then(([network, descriptions]) => {
+            networkData = network;
+            lcsNamesData = descriptions;
+            document.getElementById('statusTxt').innerText = '✓ 3D Alignment layers & LCS Descriptions cached. Ready for data processing.';
+            document.getElementById('csvFileInput').disabled = false;
+        })
+        .catch(() => {
+            document.getElementById('statusTxt').innerText = '❌ Error: Failed to load system geometry or description JSON assets from /data/';
+        });
 
         function setMode(mode) {
             activeMode = mode;
@@ -327,6 +332,10 @@
                                     const match = findGlobal3DMatch(networkData, easting, northing, elevation);
                                     const preciseM = match.chainage.toFixed(3);
                                     const formattedOffset = match.horizontalOffset.toFixed(3);
+
+                                    const signedOffsetH = match.direction === "L" 
+                                        ? `-${formattedOffset}` 
+                                        : `${formattedOffset}`;
                                     
                                     const zeroOffsetLcs = `${match.assetPrefix}-${preciseM}-${match.direction}0.000`;
                                     const centerline = findCoordinatesFromLCS(networkData, zeroOffsetLcs);
@@ -334,10 +343,11 @@
                                     latestProcessedData.push({
                                         PointID: pointId,
                                         Track_Prefix: match.assetPrefix,
+                                        Location_Name: getLcsLocationDescription(match.assetPrefix), 
                                         L2_4_LCS: `${match.assetPrefix}-${Math.round(match.chainage)}`,
                                         Full_LCS_String: `${match.assetPrefix}-${preciseM}-${match.direction}${formattedOffset}`,
                                         Chainage: preciseM,
-                                        Offset_H: formattedOffset,
+                                        Offset_H: signedOffsetH,
                                         Offset_V: match.verticalOffset.toFixed(3),
                                         Centerline_E: centerline.easting.toFixed(3),
                                         Centerline_N: centerline.northing.toFixed(3),
@@ -365,16 +375,21 @@
                                     // Apply the vertical adjustment to the baseline track profile
                                     const absoluteElevation = geom.elevation + offV;
 
-                                    latestProcessedData.push({
-                                        PointID: pointId,
-                                        LCS_Code: lcsCode,
-                                        Vert_Offset: offV.toFixed(3),
-                                        Line_Match: geom.assetPrefix,
-                                        Easting: geom.easting.toFixed(3),
-                                        Northing: geom.northing.toFixed(3),
-                                        Elevation: absoluteElevation.toFixed(3)
-                                    });
-                                } catch(err) {
+                                    const signedOffsetH = dir === "L" ? `-${offH.toFixed(3)}` : `${offH.toFixed(3)}`;
+
+                    latestProcessedData.push({
+                        PointID: `Point-${i+1}`,
+                        Built_LCS_String: builtLcsCode,
+                        Location_Name: getLcsLocationDescription(prefix),
+                        Chainage: chVal.toFixed(3),
+                        Offset_H: signedOffsetH, // <-- Signed value output
+                        Offset_V: offV.toFixed(3),
+                        Matched_Track: geom.assetPrefix,
+                        Easting: geom.easting.toFixed(3),
+                        Northing: geom.northing.toFixed(3),
+                        Elevation: absoluteElevation.toFixed(3)
+                    });
+                } catch(err) {
                                     latestProcessedData.push({ PointID: pointId, Status: `ERROR: ${err.message}` });
                                 }
                             }
@@ -389,6 +404,12 @@
                 }
             });
         });
+
+        function getLcsLocationDescription(prefix) {
+            // Split by dash to isolate Level 1 segment identifier
+            const level1Code = prefix.split('-')[0].toUpperCase();
+            return lcsNamesData[level1Code] || "Unknown Track Segment";
+        }
 
         function renderTable() {
             const head = document.getElementById('datagridHead');
@@ -542,14 +563,19 @@
                     // Incorporate explicit Z vertical offset factor calculation adjustments directly
                     const absoluteElevation = geom.elevation + offV;
 
+                    const signedOffsetH = dir === "L" ? `-${offH.toFixed(3)}` : `${offH.toFixed(3)}`;
+
                     latestProcessedData.push({
                         PointID: `Point-${i+1}`,
                         Built_LCS_String: builtLcsCode,
-                        Vert_Offset: offV.toFixed(3),
+                        Location_Name: getLcsLocationDescription(prefix),
+                        Chainage: chVal.toFixed(3),
+                        Offset_H: signedOffsetH, // <-- Signed value output
+                        Offset_V: offV.toFixed(3),
                         Matched_Track: geom.assetPrefix,
                         Easting: geom.easting.toFixed(3),
                         Northing: geom.northing.toFixed(3),
-                        Elevation: absoluteElevation.toFixed(3) // <-- Output reflects track baseline profile adjusted by Z offset
+                        Elevation: absoluteElevation.toFixed(3)
                     });
                 } catch(err) {
                     latestProcessedData.push({ PointID: `Row-${i+1}`, Status: `ERROR: Calculation boundary exception` });
