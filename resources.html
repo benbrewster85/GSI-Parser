@@ -9,6 +9,27 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     
     <style>
+
+        table {
+    width: 100%;
+    table-layout: fixed; /* Forces consistent column widths across different tables */
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+/* Allocate a specific percentage or fixed width to the first column */
+table th:first-child, 
+table td:first-child {
+    width: 25%; /* Adjust this percentage to your liking */
+    word-wrap: break-word; /* Prevents long URLs from overflowing */
+}
+
+/* The second column will automatically take up the remaining 75% */
+table th:last-child, 
+table td:last-child {
+    width: 75%;
+}
+
         .container {
             max-width: 900px;
             margin: 0 auto;
@@ -79,7 +100,7 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </div><br>
 
             <div class="section">
                 <h4>Publications & News</h4>
@@ -103,7 +124,7 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </div><br>
 
             <div class="section">
                 <h4>Technical & Educational Resources</h4>
