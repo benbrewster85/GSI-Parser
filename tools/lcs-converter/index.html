@@ -107,6 +107,7 @@
                 <a href="/about.html">About</a>
                 <a href="/resources.html">Resources</a>
                 <a href="/blog/index.html">Blog & News</a>
+                <a href="/services.html">Services</a>
             </div>
         </div>
         <button class="theme-btn" id="themeBtn">🌓</button>
@@ -226,7 +227,7 @@
     </div>
 
     <div class="footer">
-        © Survey Tools 2026
+        © Survey Tools 2026 | Website by <a href="mailto:ben@surveytools.com">Ben</a>
     </div>
 
     <!-- Wire straight into your main layout initialization logic scripts -->
@@ -359,6 +360,9 @@
             const dropZone = document.querySelector('.drop-zone');
             const builderZone = document.getElementById('builderZone');
             
+            // Locate the parent help text element containing the required column list
+            const helpText = document.querySelector('.help-text');
+            
             document.getElementById('resultsCard').classList.add('hidden');
             latestProcessedData = [];
 
@@ -371,14 +375,18 @@
             if (mode === 'COORD_TO_LCS') {
                 btnC.className = "btn primary"; btnC.style = "";
                 dropZone.style.display = "block"; builderZone.classList.add('hidden');
+                helpText.classList.remove('hidden'); // <-- Show help text
                 cols.innerText = '[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation';
             } else if (mode === 'LCS_TO_COORD') {
                 btnL.className = "btn primary"; btnL.style = "";
                 dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code (ex. ABC-1234.567-L1.234), [Col 2] Optional Vertical Offset (m)';
+                helpText.classList.remove('hidden'); // <-- Show help text
+                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code';
             } else {
                 btnB.className = "btn primary"; btnB.style = "";
                 dropZone.style.display = "none"; builderZone.classList.remove('hidden');
+                helpText.classList.add('hidden'); // <-- HIDE help text completely in Builder Mode
+                
                 // Prime the builder with its first row if empty
                 if (document.getElementById('builderRowsBody').children.length === 0) {
                     addBuilderRow();

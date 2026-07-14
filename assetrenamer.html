@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survey Tools - E57 Converter</title>
+    <title>Survey Tools - Asset Image Sequencer</title>
     <link rel="stylesheet" href="../../css/style.css">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -22,6 +22,7 @@
             max-width: 800px; /* Or your preferred max-width */
             margin: 40px auto;
             overflow: hidden;
+            height: 500px; /* Set a fixed height for the container */
             border-radius: 8px;
             border: 1px solid var(--border);
             background: var(--surface);
@@ -35,7 +36,8 @@
         .carousel-slide img {
             width: 100%;
             flex-shrink: 0;
-            object-fit: cover;
+            object-fit: contain; /* Use 'contain' to see the full image */
+            height: 100%; /* Make image fill the container height */
         }
 
         .carousel-btn {
@@ -83,32 +85,35 @@
         <main>
             <div class="local-header" style="margin-bottom: 40px;">
                 <div class="local-header-container">
-                    <h2>E57 Converter</h2>
+                    <h2>Asset Image Sequencer</h2>
                 </div>
             </div>
 
             <div class="section">
                 <div class="about-content">
-                    <p>Built to enable the creation of virtual tours from 360 photographs - output in an E57 format for use in viewers such as Hexagon Geocloud, or integrated with point cloud data in other processing software, SurveyTools E57 Converter provides an easy to use interface for rapid tour creation.</p>
+                    <p>Designed specifically for the renaming of sequential images, where a standard name + suffix process falls short, and manual renaming is time-consuming.</p>
                     <br>
-                    <p>Designed for use in the rail industry, this tool enables the creation of virtual tours where other methods fall short. Enabling engineers, designers and other stakeholders to virtually visit sites reducing boots on the ground.</p>
+                    <p>Utilising a simple step-by-step process with built in error detection, this lightweight tool takes a folder of images and an associated CSV file with names as input, replacing or creating copies of the original files, with original EXIF and Metadata intact.</p>
+                    <br>
+                    <p>Working particularly well with large datasets of sequential images, or in situations where naming files in a tabular (Excel) format is more convenient than renaming files one-by-one.</p>
                     <br>
                     <br><p><b>Features:</b></p>
                     <br>
                     <ul>
-                        <li><strong>Connect photographs to real-world coordinates:</strong> Using a simple ingestion procedure, uploading a csv with coordinates (relative, or real world) creates the spatial link.</li>
-                        <li><strong>Visualise the tour before publishing:</strong> Ensure everything is as it should be before committing to processing your files.</li>
-                        <li><strong>Calibrate image alignments visually:</strong> Use the built in calibration feature to adjust the image heading ensuring an accurate virtual tour.</li>
-                        <li><strong>Stamp information directly to imagery:</strong> For long rail alignments, knowing the location and context of each photograph is essential. Simply stamp the file name on the photograph to remove ambiguity.</li>
+                        <li><strong>Rename files based on CSV data:</strong> Perfect for large datasets or photos in sequence.</li>
+                        <li><strong>Check your data:</strong> Built in alerts for inconsistencies in input data.</li>
+                        <li><strong>Remove duplicate shots:</strong> Tool interrogates imagery to alert where two photos taken within a short period of time.</li>
+                        <li><strong>Choose your output:</strong> Select whether to replace or create copies of the original files.</li>
                     </ul><br>
                     <br>
 
                     <!-- Image Carousel Section -->
             <div class="carousel-container">
                 <div class="carousel-slide">
-                    <img src="../Images/e57-2.jpg" alt="E57 Converter Feature 1 - organise and analyse your 360 images">
-                    <img src="../Images/e57-3.jpg" alt="E57 Converter Feature 2 - precisely calibrate image headings">
-                    <img src="../Images/e57-1.jpg" alt="E57 Converter - After calibration">
+                    <img src="../Images/IMGSEQ-1.png" alt="Asset Image Sequencer 1 - Select your input folder and CSV file">
+                    <img src="../Images/IMGSEQ-2.png" alt="Asset Image Sequencer 2 - Check your data and select output options">
+                    <img src="../Images/IMGSEQ-3.png" alt="Asset Image Sequencer 3 - Review and confirm changes">
+                    <img src="../Images/IMGSEQ-4.png" alt="Asset Image Sequencer 4 - Execute renaming process">
                     
                 </div>
                 <button class="carousel-btn prev" onclick="moveSlide(-1)">&#10094;</button>
@@ -116,7 +121,7 @@
             </div>
                     
                     <br>
-                    <p>Documentation for the E57 Converter is available <a href="/360 E57 Converter Documentation.pdf" target="_blank">here</a>.</p><br>
+                    <p>Documentation for the Asset Image Sequencer is TBC</p><br>
                     <br>
                     <p>This tool is available direct from the developers. Please contact us at <a href="mailto:ben@surveytools.co.uk">ben@surveytools.co.uk</a> for more information.</p>
                 </div>
