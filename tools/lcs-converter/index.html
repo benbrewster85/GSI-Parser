@@ -203,7 +203,7 @@
                 <div class="help-text">
                     <br>
     <p>• <strong>Required Position Order (No Headers):</strong> <span id="colsTxt" style="font-family:monospace; color:var(--accent);">[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation</span></p>
-    <p>• Heavy calculation loops execute isolated completely within local browser thread allocations.</p>
+    <p>• Calculations executed completely within local browser.</p>
 </div>
             </div>
 
@@ -375,7 +375,7 @@
             } else if (mode === 'LCS_TO_COORD') {
                 btnL.className = "btn primary"; btnL.style = "";
                 dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code';
+                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code (ex. ABC-1234.567-L1.234), [Col 2] Optional Vertical Offset (m)';
             } else {
                 btnB.className = "btn primary"; btnB.style = "";
                 dropZone.style.display = "none"; builderZone.classList.remove('hidden');
