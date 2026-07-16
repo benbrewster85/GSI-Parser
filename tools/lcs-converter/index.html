@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="../../css/style.css">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <style>
+
+        #builderZone select, 
+#builderZone input[type="number"] {
+    height: 32px;                  /* Explicit matching height */
+    box-sizing: border-box;         /* Prevents padding from ballooning the size */
+    padding: 6px 12px;              /* Uniform internal space */
+    font-size: 12px;
+    line-height: 1.5;               /* Centers the text vertically inside the box */
+    vertical-align: middle;         /* Aligns inputs perfectly on the same baseline */
+}
         /* Tool-Specific Layout Configurations */
         .lcs-layout-grid {
             display: flex;
@@ -193,9 +203,12 @@
             <input type="number" id="genIntervalInput" value="2.500" step="0.5" style="width:100px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
         </div>
         <div>
-            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Side</label>
-            <select id="genDirSelect" style="padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;"><option value="L">L</option><option value="R">R</option></select>
-        </div>
+    <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Side</label>
+    <select id="genDirSelect" style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+        <option value="L">L</option>
+        <option value="R">R</option>
+    </select>
+</div>
         <div>
             <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Horiz / Vert Offsets (m)</label>
             <div style="display:flex; gap:5px;">
