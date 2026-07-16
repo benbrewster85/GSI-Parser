@@ -54,6 +54,10 @@
             margin-top: 15px;
         }
 
+        .hidden {
+    display: none !important;
+}
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -204,36 +208,38 @@
             <button class="btn" onclick="generateIntervalRows(true)" style="padding: 6px 12px; font-size: 12px; background: var(--surface); border: 1px solid var(--border);">➕ Append Array</button>
             <button class="btn" onclick="clearBuilderGrid()" style="padding: 6px 12px; font-size: 12px; background: #8e1c1c; color: white; border: none; transition: background 0.2s;">🧹 Clear All</button>
         </div>
+    </div> <!-- FIXED: This closes the Interval Generator Control Block cleanly -->
 
     <div style="overflow-x: auto;">
-        
         <table style="width: 100%; min-width: 700px;">
             <thead>
-    <tr>
-        <th style="width: 140px;">Line Category</th>
-        <th style="width: 160px;">Track Section (Prefix)</th>
-        <th>Chainage (m)</th>
-        <th style="width: 75px;">Side</th>
-        <th>Horiz. Offset (m)</th>
-        <th>Vert. Offset (m)</th>
-        <th style="width: 50px;">Action</th>
-    </tr>
-</thead>
+                <tr>
+                    <th style="width: 140px;">Line Category</th>
+                    <th style="width: 160px;">Track Section (Prefix)</th>
+                    <th>Chainage (m)</th>
+                    <th style="width: 75px;">Side</th>
+                    <th>Horiz. Offset (m)</th>
+                    <th>Vert. Offset (m)</th>
+                    <th style="width: 50px;">Action</th>
+                </tr>
+            </thead>
             <tbody id="builderRowsBody">
                 <!-- Javascript dynamically injects rows here -->
             </tbody>
         </table>
     </div>
+    
     <div style="margin-top: 15px; display: flex; gap: 10px;">
         <button class="btn" onclick="addBuilderRow()" style="background: var(--bg); border: 1px solid var(--border);">+ Add Row</button>
         <button class="btn primary" onclick="processBuilderRows()">⚡ Calculate Coordinates</button>
     </div>
 </div>
 
-                <div class="help-text">
-                    <br>
+                <div class="help-text" id="uploadHelpText">
+    <br>
     <p>• <strong>Required Position Order (No Headers):</strong> <span id="colsTxt" style="font-family:monospace; color:var(--accent);">[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation</span></p>
-    <p>• Calculations executed completely within local browser.</p>
+    <p>• <strong>Download Template:</strong> <a id="sampleFileLink" href="sample-coord-to-lcs.csv" download style="color: var(--accent); font-weight: 500; text-decoration: underline;">sample-coord-to-lcs.csv</a></p>
+    <p>• Calculations executed completely within local browser</p>
 </div>
             </div>
 
@@ -398,12 +404,14 @@
             const cols = document.getElementById('colsTxt');
             const dropZone = document.querySelector('.drop-zone');
             const builderZone = document.getElementById('builderZone');
-            const helpText = document.querySelector('.help-text');
+            
+            const helpText = document.getElementById('uploadHelpText');
+            // Locate the template link element
+            const sampleLink = document.getElementById('sampleFileLink');
             
             document.getElementById('resultsCard').classList.add('hidden');
             latestProcessedData = [];
 
-            // Reset tab button states
             [btnC, btnL, btnB].forEach(b => {
                 b.className = "btn";
                 b.style = "background:var(--surface); border:1px solid var(--border);";
@@ -411,20 +419,37 @@
 
             if (mode === 'COORD_TO_LCS') {
                 btnC.className = "btn primary"; btnC.style = "";
-                dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                helpText.classList.remove('hidden');
-                cols.innerText = '[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation';
+                dropZone.style.display = "block"; 
+                builderZone.classList.add('hidden');
+                
+                if (helpText) helpText.classList.remove('hidden'); 
+                cols.innerText = '[Col 0] Point ID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation';
+                
+                // Update link properties for coordinate uploads
+                if (sampleLink) {
+                    sampleLink.href = 'sample-coord-to-lcs.csv';
+                    sampleLink.innerText = 'sample-coord-to-lcs.csv';
+                }
             } else if (mode === 'LCS_TO_COORD') {
                 btnL.className = "btn primary"; btnL.style = "";
-                dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                helpText.classList.remove('hidden');
-                cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code';
+                dropZone.style.display = "block"; 
+                builderZone.classList.add('hidden');
+                
+                if (helpText) helpText.classList.remove('hidden');
+                cols.innerText = '[Col 0] Point ID, [Col 1] LCS Code, [Col 2 (optional)] Z Offset';
+                
+                // Update link properties for LCS string shorthand uploads
+                if (sampleLink) {
+                    sampleLink.href = 'sample-lcs-to-coord.csv';
+                    sampleLink.innerText = 'sample-lcs-to-coord.csv';
+                }
             } else {
                 btnB.className = "btn primary"; btnB.style = "";
-                dropZone.style.display = "none"; builderZone.classList.remove('hidden');
-                helpText.classList.add('hidden');
+                dropZone.style.display = "none"; 
+                builderZone.classList.remove('hidden');
                 
-                // Prime the builder with its first row if empty
+                if (helpText) helpText.classList.add('hidden');
+                
                 if (document.getElementById('builderRowsBody').children.length === 0) {
                     addBuilderRow();
                 }
