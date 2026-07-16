@@ -142,7 +142,7 @@
             <br>
             <div class="advanced-group">
                 <h4>LCS Builder Feature</h4>
-                <p>The LCS Builder allows users to manually create LCS entries for conversion to LSG coordinates. Beware the lack of a save function if building multiple entries.</p>
+                <p>The LCS Builder allows users to manually create LCS entries, either by array or row-by-row, for conversion to LSG coordinates. Beware the lack of a save function if building multiple entries.</p>
             </div>
             </div>
         </div> 
@@ -177,7 +177,36 @@
                 <!-- Interactive LCS Builder Panel -->
 <div id="builderZone" class="workspace-card hidden" style="margin-top: 20px;">
     <h3 style="font-size: 16px; margin-bottom: 15px;">Manual LCS Builder</h3>
+    
+    <!-- ADDED: Interval Generator Control Block -->
+    <div style="background: var(--bg); padding: 15px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Select Section</label>
+            <select id="genPrefixSelect" style="padding:6px; font-size:12px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; min-width: 200px;"></select>
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Interval Step (m)</label>
+            <input type="number" id="genIntervalInput" value="2.500" step="0.5" style="width:100px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Side</label>
+            <select id="genDirSelect" style="padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;"><option value="L">L</option><option value="R">R</option></select>
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Horiz / Vert Offsets (m)</label>
+            <div style="display:flex; gap:5px;">
+                <input type="number" id="genOffsetH" value="0.000" step="0.001" placeholder="H" style="width:70px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
+                <input type="number" id="genOffsetV" value="0.000" step="0.001" placeholder="V" style="width:70px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn primary" onclick="generateIntervalRows(false)" style="padding: 6px 12px; font-size: 12px;">🧱 Generate New Array</button>
+            <button class="btn" onclick="generateIntervalRows(true)" style="padding: 6px 12px; font-size: 12px; background: var(--surface); border: 1px solid var(--border);">➕ Append Array</button>
+            <button class="btn" onclick="clearBuilderGrid()" style="padding: 6px 12px; font-size: 12px; background: #8e1c1c; color: white; border: none; transition: background 0.2s;">🧹 Clear All</button>
+        </div>
+
     <div style="overflow-x: auto;">
+        
         <table style="width: 100%; min-width: 700px;">
             <thead>
     <tr>
@@ -283,6 +312,8 @@
             };
         }
 
+        
+
         function findGlobal3DMatch(networkData, e, n, z) {
             let bestMatch = null;
             let minDistance = Infinity;
@@ -336,7 +367,9 @@
             document.getElementById('aboutSection').classList.toggle('hidden');
         });
 
-        // Initialize and fetch data framework mapping
+        // ====================================================================
+        // INITIALIZATION & DATA LOADING
+        // ====================================================================
         Promise.all([
             fetch('/data/master_track_network.json').then(res => { if(!res.ok) throw Error(); return res.json(); }),
             fetch('/data/lcs_descriptions.json').then(res => { if(!res.ok) throw Error(); return res.json(); })
@@ -344,6 +377,9 @@
         .then(([network, descriptions]) => {
             networkData = network;
             lcsNamesData = descriptions;
+            
+            populateGeneratorDropdown(); // Populate the new interval tool dropdown
+            
             document.getElementById('statusTxt').innerText = '✓ 3D Alignment layers & LCS Descriptions cached. Ready for data processing.';
             document.getElementById('csvFileInput').disabled = false;
         })
@@ -351,6 +387,9 @@
             document.getElementById('statusTxt').innerText = '❌ Error: Failed to load system geometry or description JSON assets from /data/';
         });
 
+        // ====================================================================
+        // MODE CONTROLLER
+        // ====================================================================
         function setMode(mode) {
             activeMode = mode;
             const btnC = document.getElementById('btnCoord');
@@ -359,8 +398,6 @@
             const cols = document.getElementById('colsTxt');
             const dropZone = document.querySelector('.drop-zone');
             const builderZone = document.getElementById('builderZone');
-            
-            // Locate the parent help text element containing the required column list
             const helpText = document.querySelector('.help-text');
             
             document.getElementById('resultsCard').classList.add('hidden');
@@ -375,17 +412,17 @@
             if (mode === 'COORD_TO_LCS') {
                 btnC.className = "btn primary"; btnC.style = "";
                 dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                helpText.classList.remove('hidden'); // <-- Show help text
+                helpText.classList.remove('hidden');
                 cols.innerText = '[Col 0] PointID, [Col 1] Easting, [Col 2] Northing, [Col 3] Elevation';
             } else if (mode === 'LCS_TO_COORD') {
                 btnL.className = "btn primary"; btnL.style = "";
                 dropZone.style.display = "block"; builderZone.classList.add('hidden');
-                helpText.classList.remove('hidden'); // <-- Show help text
+                helpText.classList.remove('hidden');
                 cols.innerText = '[Col 0] PointID, [Col 1] LCS_Code';
             } else {
                 btnB.className = "btn primary"; btnB.style = "";
                 dropZone.style.display = "none"; builderZone.classList.remove('hidden');
-                helpText.classList.add('hidden'); // <-- HIDE help text completely in Builder Mode
+                helpText.classList.add('hidden');
                 
                 // Prime the builder with its first row if empty
                 if (document.getElementById('builderRowsBody').children.length === 0) {
@@ -693,6 +730,133 @@
 
             renderTable();
             document.getElementById('statusTxt').innerText = `✓ Vector transformations calculated successfully. View results grid dataset matrix parameters below.`;
+        }
+
+        // 1. Populate the Interval Generator dropdown options when network data finishes caching
+        function populateGeneratorDropdown() {
+            const selectEl = document.getElementById('genPrefixSelect');
+            if (!networkData || !selectEl) return;
+            
+            selectEl.innerHTML = Object.keys(networkData)
+                .sort()
+                .map(prefix => {
+                    // Extract the human-readable location description (e.g. Marylebone, Southbound, etc.)
+                    const description = getLcsLocationDescription(prefix);
+                    return `<option value="${prefix}">${prefix} - ${description}</option>`;
+                })
+                .join('');
+        }
+
+        // 2. mass-generate calculated intervals across the track profile length (supporting append options)
+        function generateIntervalRows(append = false) {
+            if (!networkData) return;
+
+            const prefix = document.getElementById('genPrefixSelect').value;
+            const stepSize = parseFloat(document.getElementById('genIntervalInput').value);
+            const side = document.getElementById('genDirSelect').value;
+            const offsetH = parseFloat(document.getElementById('genOffsetH').value || '0');
+            const offsetV = parseFloat(document.getElementById('genOffsetV').value || '0');
+
+            if (isNaN(stepSize) || stepSize <= 0) {
+                alert("Please declare a valid interval frequency spacing value greater than 0.");
+                return;
+            }
+
+            const trackArray = networkData[prefix];
+            if (!trackArray || trackArray.length < 2) return;
+
+            // Extract true spatial limits directly out of the alignment arrays
+            const startM = trackArray[0].m;
+            const endM = trackArray[trackArray.length - 1].m;
+
+            const tbody = document.getElementById('builderRowsBody');
+            
+            // If NOT appending, clear out any pre-existing rows
+            if (!append) {
+                tbody.innerHTML = '';
+            }
+
+            let currentM = startM;
+            let rowsAddedCount = 0;
+            
+            // Generate entries incrementally step-by-step
+            while (currentM <= endM) {
+                const lineCat = prefix.split('-')[0].toUpperCase();
+
+                const selectL = (side === 'L') ? 'selected' : '';
+                const selectR = (side === 'R') ? 'selected' : '';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><select class="b-line" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${lineCat}">${lineCat}</option></select></td>
+                    <td><select class="b-prefix" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${prefix}">${prefix}</option></select></td>
+                    <td><input type="number" step="0.001" class="b-chainage" value="${currentM.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td>
+                        <select class="b-dir" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                            <option value="L" ${selectL}>L</option>
+                            <option value="R" ${selectR}>R</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.001" class="b-offset" value="${offsetH.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td><input type="number" step="0.001" class="b-voffset" value="${offsetV.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td><button class="btn small" onclick="this.parentElement.parentElement.remove()" style="padding:4px 8px; background:red; color:white; border:none; border-radius:4px;">X</button></td>
+                `;
+                tbody.appendChild(tr);
+                rowsAddedCount++;
+                currentM += stepSize;
+            }
+
+            // Always drop one clean structural closing point right on the final asset terminal bound
+            if ((currentM - stepSize) < endM) {
+                const lineCat = prefix.split('-')[0].toUpperCase();
+                
+                const selectL = (side === 'L') ? 'selected' : '';
+                const selectR = (side === 'R') ? 'selected' : '';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><select class="b-line" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${lineCat}">${lineCat}</option></select></td>
+                    <td><select class="b-prefix" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${prefix}">${prefix}</option></select></td>
+                    <td><input type="number" step="0.001" class="b-chainage" value="${endM.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td>
+                        <select class="b-dir" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                            <option value="L" ${selectL}>L</option>
+                            <option value="R" ${selectR}>R</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.001" class="b-offset" value="${offsetH.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td><input type="number" step="0.001" class="b-voffset" value="${offsetV.toFixed(3)}" style="width:100%; padding:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"></td>
+                    <td><button class="btn small" onclick="this.parentElement.parentElement.remove()" style="padding:4px 8px; background:red; color:white; border:none; border-radius:4px;">X</button></td>
+                `;
+                tbody.appendChild(tr);
+                rowsAddedCount++;
+            }
+            
+            document.getElementById('statusTxt').innerText = append 
+                ? `✓ Appended ${rowsAddedCount} interval points. Total grid size: ${tbody.children.length} rows.`
+                : `✓ Generated ${rowsAddedCount} interval points across section bounds. Hit 'Calculate Coordinates' to process.`;
+        }
+
+        // 3. Clear all entries in the manual builder register with a confirmation warning
+        function clearBuilderGrid() {
+            const tbody = document.getElementById('builderRowsBody');
+            
+            // Return early if there's nothing to clear
+            if (tbody.children.length === 0) return;
+
+            const confirmed = confirm(`Are you sure you want to clear all ${tbody.children.length} rows currently entered in the manual builder? This action cannot be undone.`);
+            
+            if (confirmed) {
+                tbody.innerHTML = '';
+                
+                // Hide results card since the inputs are now empty
+                document.getElementById('resultsCard').classList.add('hidden');
+                
+                // Prime with one default clean line so the grid isn't empty
+                addBuilderRow();
+                
+                document.getElementById('statusTxt').innerText = "✓ Manual LCS Builder grid cleared.";
+            }
         }
     </script>
 </body>
