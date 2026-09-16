@@ -587,11 +587,13 @@
         });
 
         function getLcsLocationDescription(prefix) {
-            // Split by dash to isolate Level 1 segment identifier
-            const level1Code = prefix.split('-')[0].toUpperCase();
-            return lcsNamesData[level1Code] || "Unknown Track Segment";
-        }
-
+    const level1Code = prefix.split('-')[0].toUpperCase();
+    if (lcsNamesData[level1Code]) {
+        return lcsNamesData[level1Code];
+    }
+    // Fallback if no human-readable name is available:
+    return `DLR Section (${prefix})`;
+}
         function renderTable() {
             const head = document.getElementById('datagridHead');
             const body = document.getElementById('datagridBody');
