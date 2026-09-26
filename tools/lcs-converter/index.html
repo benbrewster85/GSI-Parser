@@ -192,23 +192,31 @@
 <div id="builderZone" class="workspace-card hidden" style="margin-top: 20px;">
     <h3 style="font-size: 16px; margin-bottom: 15px;">Manual LCS Builder</h3>
     
-    <!-- ADDED: Interval Generator Control Block -->
+        <!-- ADDED: Interval Generator Control Block -->
     <div style="background: var(--bg); padding: 15px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
         <div>
             <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Select Section</label>
             <select id="genPrefixSelect" style="padding:6px; font-size:12px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; min-width: 200px;"></select>
         </div>
         <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Start Ch (m)</label>
+            <input type="number" id="genStartCh" placeholder="e.g. 0.000" step="0.001" style="width:105px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
+        </div>
+        <div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">End Ch (m)</label>
+            <input type="number" id="genEndCh" placeholder="e.g. 500.000" step="0.001" style="width:105px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
+        </div>
+        <div>
             <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Interval Step (m)</label>
             <input type="number" id="genIntervalInput" value="2.500" step="0.5" style="width:100px; padding:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:12px;">
         </div>
         <div>
-    <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Side</label>
-    <select id="genDirSelect" style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px;">
-        <option value="L">L</option>
-        <option value="R">R</option>
-    </select>
-</div>
+            <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Side</label>
+            <select id="genDirSelect" style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+                <option value="L">L</option>
+                <option value="R">R</option>
+            </select>
+        </div>
         <div>
             <label style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; margin-bottom:5px; color:var(--text-dim);">Horiz / Vert Offsets (m)</label>
             <div style="display:flex; gap:5px;">
@@ -221,7 +229,8 @@
             <button class="btn" onclick="generateIntervalRows(true)" style="padding: 6px 12px; font-size: 12px; background: var(--surface); border: 1px solid var(--border);">➕ Append Array</button>
             <button class="btn" onclick="clearBuilderGrid()" style="padding: 6px 12px; font-size: 12px; background: #8e1c1c; color: white; border: none; transition: background 0.2s;">🧹 Clear All</button>
         </div>
-    </div> <!-- FIXED: This closes the Interval Generator Control Block cleanly -->
+    </div>
+<!-- FIXED: This closes the Interval Generator Control Block cleanly -->
 
     <div style="overflow-x: auto;">
         <table style="width: 100%; min-width: 700px;">
@@ -788,10 +797,13 @@
         }
 
         // 2. mass-generate calculated intervals across the track profile length (supporting append options)
+                // 2. mass-generate calculated intervals across the track profile length (supporting append & optional range bounds)
         function generateIntervalRows(append = false) {
             if (!networkData) return;
 
             const prefix = document.getElementById('genPrefixSelect').value;
+            const rawStart = document.getElementById('genStartCh').value.trim();
+            const rawEnd = document.getElementById('genEndCh').value.trim();
             const stepSize = parseFloat(document.getElementById('genIntervalInput').value);
             const side = document.getElementById('genDirSelect').value;
             const offsetH = parseFloat(document.getElementById('genOffsetH').value || '0');
@@ -805,27 +817,51 @@
             const trackArray = networkData[prefix];
             if (!trackArray || trackArray.length < 2) return;
 
-            // Extract true spatial limits directly out of the alignment arrays
-            const startM = trackArray[0].m;
-            const endM = trackArray[trackArray.length - 1].m;
+            const trackMinM = trackArray[0].m;
+            const trackMaxM = trackArray[trackArray.length - 1].m;
+
+            // Boundary resolution logic:
+            // 1. If start is provided, use it.
+            // 2. If start is missing but end is provided, start begins at 0.000 (clamped to track minimum).
+            // 3. If neither is provided, start from track beginning.
+            let startM;
+            if (rawStart !== "") {
+                startM = parseFloat(rawStart);
+            } else if (rawEnd !== "") {
+                startM = Math.max(0.000, trackMinM);
+            } else {
+                startM = trackMinM;
+            }
+
+            // 4. If end is provided, use it. If omitted, continue to track end.
+            let endM = (rawEnd !== "") ? parseFloat(rawEnd) : trackMaxM;
+
+            if (isNaN(startM) || isNaN(endM)) {
+                alert("Invalid chainage value entered for start or end bounds.");
+                return;
+            }
+
+            if (startM > endM) {
+                alert(`Start chainage (${startM.toFixed(3)}) cannot be greater than end chainage (${endM.toFixed(3)}).`);
+                return;
+            }
+
+            // Clamp bounds safely to track limits
+            startM = Math.max(trackMinM, startM);
+            endM = Math.min(trackMaxM, endM);
 
             const tbody = document.getElementById('builderRowsBody');
-            
-            // If NOT appending, clear out any pre-existing rows
             if (!append) {
                 tbody.innerHTML = '';
             }
 
             let currentM = startM;
             let rowsAddedCount = 0;
-            
-            // Generate entries incrementally step-by-step
+            const lineCat = prefix.split('-')[0].toUpperCase();
+            const selectL = (side === 'L') ? 'selected' : '';
+            const selectR = (side === 'R') ? 'selected' : '';
+
             while (currentM <= endM) {
-                const lineCat = prefix.split('-')[0].toUpperCase();
-
-                const selectL = (side === 'L') ? 'selected' : '';
-                const selectR = (side === 'R') ? 'selected' : '';
-
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><select class="b-line" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${lineCat}">${lineCat}</option></select></td>
@@ -846,13 +882,8 @@
                 currentM += stepSize;
             }
 
-            // Always drop one clean structural closing point right on the final asset terminal bound
-            if ((currentM - stepSize) < endM) {
-                const lineCat = prefix.split('-')[0].toUpperCase();
-                
-                const selectL = (side === 'L') ? 'selected' : '';
-                const selectR = (side === 'R') ? 'selected' : '';
-
+            // Terminal point guarantee: drop a final point on exact end boundary if the loop stopped short
+            if ((currentM - stepSize) < (endM - 0.001)) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><select class="b-line" style="width:100%; padding:6px; font-size:12px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px;"><option value="${lineCat}">${lineCat}</option></select></td>
@@ -871,11 +902,12 @@
                 tbody.appendChild(tr);
                 rowsAddedCount++;
             }
-            
+
             document.getElementById('statusTxt').innerText = append 
-                ? `✓ Appended ${rowsAddedCount} interval points. Total grid size: ${tbody.children.length} rows.`
-                : `✓ Generated ${rowsAddedCount} interval points across section bounds. Hit 'Calculate Coordinates' to process.`;
+                ? `✓ Appended ${rowsAddedCount} interval points (${startM.toFixed(3)}m to ${endM.toFixed(3)}m). Total rows: ${tbody.children.length}.`
+                : `✓ Generated ${rowsAddedCount} interval points (${startM.toFixed(3)}m to ${endM.toFixed(3)}m). Hit 'Calculate Coordinates' to process.`;
         }
+
 
         // 3. Clear all entries in the manual builder register with a confirmation warning
         function clearBuilderGrid() {
