@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------------------
     // --- 1. CONSTANTS, VARIABLES, and UI ELEMENT SELECTORS ---
     // --------------------------------------------------------------------
+    const STADIA_API_KEY = '9388fdd4-6965-4459-93d3-ffa60d8d2652';
+
     let map;
     let marker;
     let markers = [];
@@ -177,10 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
             attribution: '&copy; Esri'
         });
 
-        // CartoDB Dark Matter - High contrast, good for overlaying colored data points
-        const darkMatter = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+
+        const darkMatter = L.tileLayer(`https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${STADIA_API_KEY}`, {
             maxZoom: 20,
-            attribution: '&copy; CartoDB'
+            attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         });
 
         // --- 2. OVERLAYS (Transparent Layers - Stack on top) ---
@@ -280,13 +282,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Map Popup Logic
+        // Map Popup Logic
     if (openMapBtn) {
         openMapBtn.addEventListener('click', () => {
             const currentCenter = map.getCenter();
             const currentZoom = map.getZoom();
             const newWindow = window.open("", "MapWindow", "width=1200,height=800");
-            if (!newWindow) { alert("Pop-up blocked!"); return; }
+            if (!newWindow) { alert("Pop-up blocked! Please allow pop-ups for this site."); return; }
 
             const pointsToTransfer = [];
             const rows = resultTbody.querySelectorAll('tr');
@@ -305,54 +307,75 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!DOCTYPE html>
                 <html lang="en">
                 <head>
+                    <meta charset="UTF-8">
                     <title>Full Page Map View</title>
                     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
                     <style>
-                        body { margin: 0; padding: 0; }
+                        html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
                         #full-map { width: 100vw; height: 100vh; }
                         .map-point-label { background-color: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.5); color: #fff; padding: 2px 5px; border-radius: 4px; }
                     </style>
                 </head>
                 <body>
                     <div id="full-map"></div>
-                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" id="leaflet-script"><\/script>
                     <script>
-                        const map = L.map('full-map').setView([${currentCenter.lat}, ${currentCenter.lng}], ${currentZoom});
-                        
-                        // Base Maps
-                        const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-                        const transportMap = L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© ÖPNVKarte' });
-                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' });
-                        const darkMatter = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, attribution: '© CartoDB' });
+                        function setupPopupMap() {
+                            const map = L.map('full-map').setView([${currentCenter.lat}, ${currentCenter.lng}], ${currentZoom});
+                            
+                            // Base Maps
+                            const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+                            const transportMap = L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© ÖPNVKarte' });
+                            const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' });
+                            
+                            // Stadia Alidade Smooth Dark
+                            const darkStadia = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${STADIA_API_KEY}', { 
+                                maxZoom: 20, 
+                                attribution: '© Stadia Maps, © OpenMapTiles, © OpenStreetMap' 
+                            });
 
-                        // Overlays
-                        const railTracks = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
-                        const railSignals = L.tileLayer('https://{s}.tiles.openrailwaymap.org/signals/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
-                        
-                        transportMap.addTo(map); // Default
+                            // Overlays
+                            const railTracks = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
+                            const railSignals = L.tileLayer('https://{s}.tiles.openrailwaymap.org/signals/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenRailwayMap' });
+                            
+                            transportMap.addTo(map);
 
-                        L.control.layers({
-                            "Transport": transportMap,
-                            "Standard": osmStandard,
-                            "Satellite": satellite,
-                            "Dark Mode": darkMatter
-                        }, {
-                            "Rail Tracks": railTracks,
-                            "Rail Signals": railSignals
-                        }).addTo(map);
+                            L.control.layers({
+                                "Transport": transportMap,
+                                "Standard": osmStandard,
+                                "Satellite": satellite,
+                                "Dark Mode (Stadia)": darkStadia
+                            }, {
+                                "Rail Tracks": railTracks,
+                                "Rail Signals": railSignals
+                            }).addTo(map);
 
-                        L.control.scale({ position: 'bottomleft', metric: true }).addTo(map);
-                        
-                        const points = ${JSON.stringify(pointsToTransfer)};
-                        const markers = [];
-                        points.forEach(p => {
-                            if(p.latitude && p.longitude) {
-                                const m = L.marker([p.latitude, p.longitude]).addTo(map);
-                                if(p.pointId) m.bindTooltip(String(p.pointId), { permanent: true, direction: 'right', offset: [12, -15], className: 'map-point-label' });
-                                markers.push(m);
+                            L.control.scale({ position: 'bottomleft', metric: true }).addTo(map);
+                            
+                            const points = ${JSON.stringify(pointsToTransfer)};
+                            const popMarkers = [];
+                            points.forEach(p => {
+                                if (p.latitude && p.longitude) {
+                                    const m = L.marker([p.latitude, p.longitude]).addTo(map);
+                                    if (p.pointId) {
+                                        m.bindTooltip(String(p.pointId), { permanent: true, direction: 'right', offset: [12, -15], className: 'map-point-label' });
+                                    }
+                                    popMarkers.push(m);
+                                }
+                            });
+                            
+                            if (popMarkers.length > 0) {
+                                const group = L.featureGroup(popMarkers).addTo(map);
+                                map.fitBounds(group.getBounds().pad(0.1));
                             }
-                        });
-                        if(markers.length > 0) L.featureGroup(markers);
+                        }
+
+                        const leafletScript = document.getElementById('leaflet-script');
+                        if (window.L) {
+                            setupPopupMap();
+                        } else {
+                            leafletScript.onload = setupPopupMap;
+                        }
                     <\/script>
                 </body>
                 </html>
@@ -360,6 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newWindow.document.close();
         });
     }
+
 
     function downloadResults() {
         const headers = "Point ID,OSGB36 E,OSGB36 N,OSGB36 H,ETRS89 Lat,ETRS89 Lon,ETRS89 h,LSG E,LSG N,LSG H";

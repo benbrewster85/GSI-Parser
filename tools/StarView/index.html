@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Tools - STAR*NET Report Viewer</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        .workspace-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            background: var(--bg);
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(0, 122, 255, 0.05);
+        }
+
+        .hidden { display: none !important; }
+
+        .table-wrapper {
+            max-height: 450px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            padding: 10px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            color: var(--text);
+            z-index: 10;
+        }
+
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'SF Mono', monospace;
+            color: var(--text-dim);
+        }
+
+        tr:hover td {
+            color: var(--text);
+            background: var(--surface);
+        }
+
+        .numeric { text-align: right; }
+        
+        .qa-fail td {
+            color: #ff4d4d;
+            background: rgba(255, 77, 77, 0.05);
+        }
+
+        .qa-fail:hover td {
+            background: rgba(255, 77, 77, 0.1);
+        }
+
+        .pill {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .pill.pass { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+        .pill.fail { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+
+        /* Interactive Canvas Architecture */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: #121417;
+            border: 1px solid var(--border);
+            border-radius: 0 0 6px 6px;
+            overflow: hidden;
+        }
+
+        #networkCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            display: block;
+        }
+
+        #networkCanvas:active {
+            cursor: grabbing;
+        }
+
+        .canvas-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg);
+            padding: 10px 15px;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .canvas-controls-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 12px;
+        }
+
+        .canvas-hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(20, 24, 30, 0.85);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            color: var(--text);
+            pointer-events: none;
+            z-index: 5;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 280px;
+        }
+
+        .canvas-floating-nav {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 5;
+        }
+
+        .nav-icon-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(30, 35, 45, 0.9);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .nav-icon-btn:hover {
+            background: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-left: 10px;
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">🛰️ Survey Tools</a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Toggle menu">☰</button>
+            <div class="nav-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/about.html">About</a>
+                <a href="/resources.html">Resources</a>
+                <a href="/services.html">Services</a>
+            </div>
+        </div>
+        <button class="theme-btn" id="themeBtn">🌓</button>
+    </nav>
+
+    <div class="container">
+        <div class="local-header" style="margin-bottom: 20px;">
+            <div class="local-header-container">
+                <h2>STAR*NET Report Viewer</h2>
+                <button class="btn" id="aboutBtn">ℹ️ About This Tool</button>
+            </div>
+        </div>
+
+        <div id="aboutSection" class="section hidden workspace-card">
+            <div class="advanced-content">
+                <p>This tool parses STAR*NET <strong>.lst</strong> files to instantly surface network health, inspect error ellipses, and diagnose blunders through an interactive vector canvas.</p>
+                <ul>
+                    <li><strong>Interactive Navigation:</strong> Scroll wheel to zoom, left-click drag to pan, hover over stations for live coordinate and ellipse inspections.</li>
+                    <li><strong>Geometry Diagnostics:</strong> Exaggerate error ellipses dynamically and trace colored lines directly to bad setups.</li>
+                </ul>
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim);">
+                    <strong>Version:</strong> 1.2 • <strong>Local Processing:</strong> Operates entirely in browser memory.
+                </div>
+            </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div class="workspace-card" id="uploadCard">
+            <div class="drop-zone" id="uploadArea">
+                <div style="font-size: 36px; margin-bottom: 10px;">📄</div>
+                <div id="uploadText">Drop STAR*NET <strong>.lst</strong> file here or click to select</div>
+                <input type="file" id="fileInput" accept=".lst,.txt" class="hidden">
+            </div>
+            <div id="statusTxt" class="status hidden" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- Global Health Stats -->
+        <div id="statsSection" class="section hidden">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statChiSquare">—</div>
+                    <div class="stat-label">Chi-Square Test</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statErrorFactor">—</div>
+                    <div class="stat-label">Error Factor</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statStations">—</div>
+                    <div class="stat-label">Total Stations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statRedundancy">—</div>
+                    <div class="stat-label">Redundant Obs</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Network Canvas -->
+        <div id="networkSection" class="workspace-card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">Interactive Network Plot</h3>
+                <span style="font-size: 12px; color: var(--text-dim);">Scroll = Zoom | Drag = Pan</span>
+            </div>
+            
+            <div class="canvas-toolbar">
+                <div class="canvas-controls-group">
+                    <div>
+                        <label style="font-weight: 600; color: var(--text-dim); margin-right: 6px;">Exaggeration:</label>
+                        <input type="range" id="ellipseExaggeration" min="100" max="10000" value="1000" step="100" style="vertical-align: middle;">
+                        <span id="exaggerationValue" style="font-family: monospace; margin-left: 6px;">1000x</span>
+                    </div>
+                    <div style="border-left: 1px solid var(--border); padding-left: 12px; display: flex; gap: 10px;">
+                        <label><input type="checkbox" id="chkLabels" checked> Labels</label>
+                        <label><input type="checkbox" id="chkEllipses" checked> Ellipses</label>
+                        <label><input type="checkbox" id="chkObservations" checked> Sightlines</label>
+                    </div>
+                </div>
+                <div>
+                    <div class="legend-item"><div class="legend-color" style="background: rgba(120,120,120,0.3);"></div> Pass (< 1.5)</div>
+                    <div class="legend-item"><div class="legend-color" style="background: rgba(241, 196, 15, 0.8);"></div> Warn (1.5 - 3.0)</div>
+                    <div class="legend-item"><div class="legend-color" style="background: rgba(231, 76, 60, 0.8);"></div> Blunder (> 3.0)</div>
+                </div>
+            </div>
+
+            <div class="canvas-container" id="canvasContainer">
+                <canvas id="networkCanvas"></canvas>
+                
+                <!-- Station Hover Details HUD -->
+                <div id="canvasHud" class="canvas-hud hidden">
+                    <div style="font-weight: bold; color: var(--accent); margin-bottom: 4px;" id="hudStationName">---</div>
+                    <div id="hudCoords">E: --- | N: ---</div>
+                    <div id="hudElev">Elev: ---</div>
+                    <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.15); color: #74b9ff;" id="hudEllipse">95% Semi-Maj: ---</div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="canvas-floating-nav">
+                    <button class="nav-icon-btn" id="btnZoomIn" title="Zoom In">+</button>
+                    <button class="nav-icon-btn" id="btnZoomOut" title="Zoom Out">−</button>
+                    <button class="nav-icon-btn" id="btnResetView" title="Reset View / Fit to Bounds">⤢</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blunder Dashboard -->
+        <div id="blunderSection" class="workspace-card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">Top Offenders (Blunder Dashboard)</h3>
+                <span style="font-size: 12px; color: var(--text-dim);">Sorted by absolute Standardized Residual</span>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th class="numeric">Value</th>
+                            <th class="numeric">Residual</th>
+                            <th class="numeric">StdErr</th>
+                            <th class="numeric">StdRes</th>
+                            <th>Source File:Line</th>
+                        </tr>
+                    </thead>
+                    <tbody id="blunderTableBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        © Survey Tools 2026 | Website by <a href="mailto:ben@surveytools.co.uk">Ben</a>
+    </div>
+
+    <script src="../../js/main.js"></script>
+    <script>
+        // ==========================================
+        // STAR*NET PARSER ENGINE
+        // ==========================================
+        class StarNetParser {
+            constructor() {
+                this.rawData = '';
+                this.summary = {
+                    errorFactor: null,
+                    chiSquareStatus: 'Unknown',
+                    iterations: 0,
+                    totalStations: 0,
+                    totalObservations: 0,
+                    redundantObs: 0
+                };
+                this.coordinates = {}; 
+                this.observations = [];
+                this.ellipses = {};
+                this.parseState = 'NONE';
+            }
+
+            parse(text) {
+                this.rawData = text;
+                const lines = text.split(/\r?\n/);
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line || line === '\f') continue;
+
+                    this.updateParseState(line);
+
+                    switch (this.parseState) {
+                        case 'STATS': this.extractStats(line); break;
+                        case 'COORDINATES': this.extractCoordinate(line); break;
+                        case 'DISTANCES': this.extractObservation(line, 'Distance', 7); break;
+                        case 'ZENITHS': this.extractObservation(line, 'Zenith', 8); break;
+                        case 'DIRECTIONS': this.extractObservation(line, 'Direction', 8); break;
+                        case 'AZIMUTHS': this.extractObservation(line, 'Azimuth', 7); break;
+                        case 'ELLIPSES': this.extractEllipse(line); break;
+                    }
+                }
+
+                return {
+                    summary: this.summary,
+                    coordinates: this.coordinates,
+                    observations: this.observations,
+                    ellipses: this.ellipses
+                };
+            }
+
+            updateParseState(line) {
+                if (line.includes('Adjustment Statistical Summary')) this.parseState = 'STATS';
+                else if (line.includes('Adjusted Coordinates (Meters)')) this.parseState = 'COORDINATES';
+                else if (line.includes('Adjusted Distance Observations')) this.parseState = 'DISTANCES';
+                else if (line.includes('Adjusted Zenith Observations')) this.parseState = 'ZENITHS';
+                else if (line.includes('Adjusted Direction Observations')) this.parseState = 'DIRECTIONS';
+                else if (line.includes('Adjusted Azimuth/Bearing Observations')) this.parseState = 'AZIMUTHS';
+                else if (line.includes('Station Coordinate Error Ellipses')) this.parseState = 'ELLIPSES';
+                else if (line.includes('Adjusted Observations and Residuals') || line.includes('Relative Error Ellipses')) {
+                    this.parseState = 'NONE';
+                }
+            }
+
+            extractStats(line) {
+                if (line.includes('Iterations')) this.summary.iterations = this.extractLastNumber(line);
+                if (line.includes('Number of Stations')) this.summary.totalStations = this.extractLastNumber(line);
+                if (line.includes('Number of Observations')) this.summary.totalObservations = this.extractLastNumber(line);
+                if (line.includes('Number of Redundant Obs')) this.summary.redundantObs = this.extractLastNumber(line);
+
+                if (line.startsWith('Total') && line.match(/\d/)) {
+                    const parts = line.split(/\s+/);
+                    this.summary.errorFactor = parseFloat(parts[parts.length - 1]);
+                }
+
+                if (line.includes('Chi-Square Test')) {
+                    if (line.includes('Passed')) this.summary.chiSquareStatus = 'Pass';
+                    else if (line.includes('Exceeded Upper Bound')) this.summary.chiSquareStatus = 'Fail (Upper)';
+                    else if (line.includes('Exceeded Lower Bound')) this.summary.chiSquareStatus = 'Fail (Lower)';
+                }
+            }
+
+            extractCoordinate(line) {
+                if (line.startsWith('Station') || !line.match(/\d/)) return;
+                const parts = line.split(/\s+/);
+                
+                if (parts.length >= 4) {
+                    const station = parts[0];
+                    const e = parseFloat(parts[1]);
+                    const n = parseFloat(parts[2]);
+                    const elev = parseFloat(parts[3]);
+                    if (!isNaN(e) && !isNaN(n)) {
+                        this.coordinates[station] = { e, n, elev };
+                    }
+                }
+            }
+
+            extractObservation(line, type, expectedParts) {
+                if (line.startsWith('From') || line.startsWith('Set') || !line.match(/\d/)) return;
+
+                const parts = line.split(/\s+/);
+                if (parts.length < expectedParts - 1) return; 
+
+                const isOutlier = line.includes('*');
+                const cleanParts = parts.map(p => p.replace('*', ''));
+                const offset = parts.length === expectedParts ? 0 : 1;
+                const lengthOffset = parts.length;
+
+                try {
+                    const stdResRaw = cleanParts[lengthOffset - 2];
+                    const stdRes = parseFloat(stdResRaw);
+                    
+                    if (!isNaN(stdRes)) {
+                        this.observations.push({
+                            type: type,
+                            from: cleanParts[0],
+                            to: cleanParts[1],
+                            value: cleanParts[2], 
+                            residual: parseFloat(cleanParts[lengthOffset - (offset === 0 ? 4 : 3)]),
+                            stdErr: parseFloat(cleanParts[lengthOffset - 3]),
+                            stdRes: stdRes,
+                            isOutlier: isOutlier || Math.abs(stdRes) >= 3.0,
+                            fileLine: cleanParts[lengthOffset - 1]
+                        });
+                    }
+                } catch (e) {
+                    console.warn(`Skipped malformed ${type} row: ${line}`);
+                }
+            }
+
+            extractEllipse(line) {
+                if (line.startsWith('Station') || line.startsWith('Axis') || !line.match(/\d/)) return;
+                const parts = line.split(/\s+/);
+                if (parts.length >= 5) {
+                    this.ellipses[parts[0]] = {
+                        semiMajor: parseFloat(parts[1]),
+                        semiMinor: parseFloat(parts[2]),
+                        azimuth: parts[3],
+                        elevation: parseFloat(parts[4])
+                    };
+                }
+            }
+
+            extractLastNumber(line) {
+                const parts = line.trim().split(/\s+/);
+                return parseFloat(parts[parts.length - 1]) || 0;
+            }
+
+            getTopBlunders(limit = 50) {
+                return this.observations
+                    .sort((a, b) => Math.abs(b.stdRes) - Math.abs(a.stdRes))
+                    .slice(0, limit);
+            }
+        }
+
+        // ==========================================
+        // INTERACTIVE CANVAS VIEW CONTROLLER (FIXED)
+        // ==========================================
+        class NetworkViewer {
+            constructor(canvasId, containerId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.getElementById(containerId);
+                this.hud = document.getElementById('canvasHud');
+                
+                this.data = null;
+                
+                // View State (Easting/Northing Center & Pixels-per-meter scale)
+                this.centerE = 0;
+                this.centerN = 0;
+                this.scale = 1;
+                this.baseScale = 1;
+
+                // Drag State
+                this.isDragging = false;
+                this.dragLastX = 0;
+                this.dragLastY = 0;
+
+                // Layer Visibility & Controls
+                this.showLabels = true;
+                this.showEllipses = true;
+                this.showObservations = true;
+                this.exaggeration = 1000;
+
+                this.initEvents();
+            }
+
+            setData(data) {
+                this.data = data;
+                this.resizeCanvas();
+                this.resetView();
+            }
+
+            resizeCanvas() {
+                const rect = this.container.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                this.ctx.resetTransform();
+                this.ctx.scale(dpr, dpr);
+                this.width = rect.width;
+                this.height = rect.height;
+            }
+
+            resetView() {
+                if (!this.data || Object.keys(this.data.coordinates).length === 0) return;
+
+                const coords = this.data.coordinates;
+                const stations = Object.keys(coords);
+
+                let minE = Infinity, maxE = -Infinity;
+                let minN = Infinity, maxN = -Infinity;
+
+                stations.forEach(st => {
+                    minE = Math.min(minE, coords[st].e);
+                    maxE = Math.max(maxE, coords[st].e);
+                    minN = Math.min(minN, coords[st].n);
+                    maxN = Math.max(maxN, coords[st].n);
+                });
+
+                this.centerE = (minE + maxE) / 2;
+                this.centerN = (minN + maxN) / 2;
+
+                const margin = 70;
+                const dE = Math.max(maxE - minE, 5);
+                const dN = Math.max(maxN - minN, 5);
+
+                const scaleE = (this.width - margin * 2) / dE;
+                const scaleN = (this.height - margin * 2) / dN;
+                this.scale = Math.min(scaleE, scaleN);
+                this.baseScale = this.scale;
+
+                this.render();
+            }
+
+            worldToScreen(e, n) {
+                return {
+                    x: this.width / 2 + (e - this.centerE) * this.scale,
+                    y: this.height / 2 - (n - this.centerN) * this.scale // Inverted: Screen +Y is South
+                };
+            }
+
+            screenToWorld(sx, sy) {
+                return {
+                    e: this.centerE + (sx - this.width / 2) / this.scale,
+                    n: this.centerN - (sy - this.height / 2) / this.scale
+                };
+            }
+
+            render() {
+                if (!this.data) return;
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.width, this.height);
+
+                const coords = this.data.coordinates;
+                const stations = Object.keys(coords);
+
+                // 1. Draw Observation Edges
+                if (this.showObservations) {
+                    const spatialObs = this.data.observations.filter(o => o.type === 'Distance' || o.type === 'Direction');
+                    
+                    spatialObs.forEach(obs => {
+                        const p1 = coords[obs.from];
+                        const p2 = coords[obs.to];
+                        if (!p1 || !p2) return;
+                        
+                        const pt1 = this.worldToScreen(p1.e, p1.n);
+                        const pt2 = this.worldToScreen(p2.e, p2.n);
+
+                        ctx.beginPath();
+                        ctx.moveTo(pt1.x, pt1.y);
+                        ctx.lineTo(pt2.x, pt2.y);
+                        
+                        const absRes = Math.abs(obs.stdRes);
+                        if (absRes >= 3.0) {
+                            ctx.strokeStyle = 'rgba(231, 76, 60, 0.85)';
+                            ctx.lineWidth = 2.5;
+                        } else if (absRes >= 1.5) {
+                            ctx.strokeStyle = 'rgba(241, 196, 15, 0.75)';
+                            ctx.lineWidth = 1.5;
+                        } else {
+                            ctx.strokeStyle = 'rgba(120, 120, 120, 0.2)';
+                            ctx.lineWidth = 1;
+                        }
+                        ctx.stroke();
+                    });
+                }
+
+                // 2. Draw Error Ellipses
+                if (this.showEllipses) {
+                    stations.forEach(st => {
+                        const ell = this.data.ellipses[st];
+                        const p = coords[st];
+                        if (!ell || !p) return;
+
+                        const pt = this.worldToScreen(p.e, p.n);
+
+                        const azParts = ell.azimuth.split('-');
+                        let azDeg = 0;
+                        if (azParts.length >= 2) azDeg = parseFloat(azParts[0]) + (parseFloat(azParts[1]) / 60);
+                        const rotRad = (azDeg - 90) * Math.PI / 180;
+
+                        const rx = ell.semiMajor * this.exaggeration * this.scale; 
+                        const ry = ell.semiMinor * this.exaggeration * this.scale;
+
+                        if (rx > 0.5 && ry > 0.5) {
+                            ctx.beginPath();
+                            ctx.ellipse(pt.x, pt.y, rx, ry, rotRad, 0, 2 * Math.PI);
+                            ctx.fillStyle = 'rgba(52, 152, 219, 0.18)';
+                            ctx.fill();
+                            ctx.strokeStyle = 'rgba(52, 152, 219, 0.85)';
+                            ctx.lineWidth = 1.2;
+                            ctx.stroke();
+                        }
+                    });
+                }
+
+                // 3. Draw Station Nodes & Labels
+                stations.forEach(st => {
+                    const p = coords[st];
+                    const pt = this.worldToScreen(p.e, p.n);
+                    
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    if (this.showLabels) {
+                        ctx.font = '11px SF Mono, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillStyle = '#e0e0e0';
+                        ctx.fillText(st, pt.x, pt.y - 7);
+                    }
+                });
+            }
+
+            initEvents() {
+                window.addEventListener('resize', () => {
+                    if (this.data) {
+                        this.resizeCanvas();
+                        this.render();
+                    }
+                });
+
+                // Pan Events (Natural 1:1 mouse tracking)
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return; // Left-click only
+                    this.isDragging = true;
+                    this.dragLastX = e.clientX;
+                    this.dragLastY = e.clientY;
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (this.isDragging) {
+                        const dx = e.clientX - this.dragLastX;
+                        const dy = e.clientY - this.dragLastY;
+                        
+                        // Dragging right moves view right (-E), dragging down moves view down (+N)
+                        this.centerE -= dx / this.scale;
+                        this.centerN += dy / this.scale; 
+
+                        this.dragLastX = e.clientX;
+                        this.dragLastY = e.clientY;
+                        this.render();
+                    } else if (this.data) {
+                        this.handleHoverInspection(e);
+                    }
+                });
+
+                window.addEventListener('mouseup', () => {
+                    this.isDragging = false;
+                });
+
+                // Smooth Zoom towards Mouse Position
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    // Smooth progressive zoom factor (dampens erratic wheel jumps)
+                    const zoomFactor = Math.exp(-e.deltaY * 0.0015);
+                    this.applyZoom(zoomFactor, mouseX, mouseY);
+                }, { passive: false });
+
+                // Floating Nav Actions
+                document.getElementById('btnZoomIn').addEventListener('click', () => {
+                    this.applyZoom(1.2, this.width / 2, this.height / 2);
+                });
+                document.getElementById('btnZoomOut').addEventListener('click', () => {
+                    this.applyZoom(0.833, this.width / 2, this.height / 2);
+                });
+                document.getElementById('btnResetView').addEventListener('click', () => {
+                    this.resetView();
+                });
+            }
+
+            applyZoom(factor, screenX, screenY) {
+                const oldScale = this.scale;
+                const newScale = Math.max(this.baseScale * 0.05, Math.min(this.scale * factor, this.baseScale * 100));
+                
+                // Maintain the world coordinate under the cursor stationary while scaling
+                const worldUnderCursor = this.screenToWorld(screenX, screenY);
+                
+                this.scale = newScale;
+                this.centerE = worldUnderCursor.e - (screenX - this.width / 2) / newScale;
+                this.centerN = worldUnderCursor.n + (screenY - this.height / 2) / newScale;
+
+                this.render();
+            }
+
+            handleHoverInspection(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const coords = this.data.coordinates;
+                let foundStation = null;
+
+                for (const st of Object.keys(coords)) {
+                    const pt = this.worldToScreen(coords[st].e, coords[st].n);
+                    const dist = Math.hypot(mouseX - pt.x, mouseY - pt.y);
+                    if (dist < 12) {
+                        foundStation = st;
+                        break;
+                    }
+                }
+
+                if (foundStation) {
+                    const p = coords[foundStation];
+                    const ell = this.data.ellipses[foundStation];
+
+                    document.getElementById('hudStationName').textContent = `Station: ${foundStation}`;
+                    document.getElementById('hudCoords').textContent = `E: ${p.e.toFixed(4)} | N: ${p.n.toFixed(4)}`;
+                    document.getElementById('hudElev').textContent = `Elev: ${p.elev.toFixed(4)} m`;
+                    
+                    if (ell) {
+                        document.getElementById('hudEllipse').textContent = `95% Semi-Maj: ${(ell.semiMajor * 1000).toFixed(1)} mm @ ${ell.azimuth}°`;
+                    } else {
+                        document.getElementById('hudEllipse').textContent = `95% Semi-Maj: Fixed / Constrained`;
+                    }
+
+                    this.hud.classList.remove('hidden');
+                } else {
+                    this.hud.classList.add('hidden');
+                }
+            }
+        }
+
+        // ==========================================
+        // APP INITIALIZATION
+        // ==========================================
+        const elements = {
+            aboutBtn: document.getElementById('aboutBtn'),
+            aboutSection: document.getElementById('aboutSection'),
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            uploadText: document.getElementById('uploadText'),
+            statusTxt: document.getElementById('statusTxt'),
+            
+            statsSection: document.getElementById('statsSection'),
+            networkSection: document.getElementById('networkSection'),
+            blunderSection: document.getElementById('blunderSection'),
+            blunderTableBody: document.getElementById('blunderTableBody'),
+            
+            statChiSquare: document.getElementById('statChiSquare'),
+            statErrorFactor: document.getElementById('statErrorFactor'),
+            statStations: document.getElementById('statStations'),
+            statRedundancy: document.getElementById('statRedundancy'),
+
+            exaggerationSlider: document.getElementById('ellipseExaggeration'),
+            exaggerationValue: document.getElementById('exaggerationValue'),
+            chkLabels: document.getElementById('chkLabels'),
+            chkEllipses: document.getElementById('chkEllipses'),
+            chkObservations: document.getElementById('chkObservations')
+        };
+
+        let parser = new StarNetParser();
+        let viewer = new NetworkViewer('networkCanvas', 'canvasContainer');
+
+        elements.aboutBtn.addEventListener('click', () => {
+            elements.aboutSection.classList.toggle('hidden');
+        });
+
+        elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
+        elements.uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); elements.uploadArea.classList.add('dragover'); });
+        elements.uploadArea.addEventListener('dragleave', () => elements.uploadArea.classList.remove('dragover'));
+        elements.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+        });
+        elements.fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        });
+
+        elements.exaggerationSlider.addEventListener('input', (e) => {
+            elements.exaggerationValue.textContent = `${e.target.value}x`;
+            viewer.exaggeration = parseFloat(e.target.value);
+            viewer.render();
+        });
+
+        elements.chkLabels.addEventListener('change', (e) => { viewer.showLabels = e.target.checked; viewer.render(); });
+        elements.chkEllipses.addEventListener('change', (e) => { viewer.showEllipses = e.target.checked; viewer.render(); });
+        elements.chkObservations.addEventListener('change', (e) => { viewer.showObservations = e.target.checked; viewer.render(); });
+
+        function showStatus(msg, type = 'info') {
+            elements.statusTxt.innerHTML = msg;
+            elements.statusTxt.className = `status ${type}`;
+            elements.statusTxt.classList.remove('hidden');
+        }
+
+        function processFile(file) {
+            showStatus('Parsing .lst file and building network vectors...', 'info');
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    parser = new StarNetParser();
+                    const data = parser.parse(e.target.result);
+                    
+                    elements.uploadText.innerHTML = `<strong>File Loaded:</strong> ${file.name}<br><span style="font-size: 12px; color: var(--text-dim);">Click or drop to load a new file</span>`;
+                    
+                    updateDashboard(data);
+                    viewer.setData(data);
+
+                    showStatus(`✓ Network ready. Visualizing ${data.summary.totalStations} stations and ${data.summary.totalObservations} observations.`, 'success');
+                } catch (error) {
+                    console.error(error);
+                    showStatus('❌ Failed to parse file. Ensure it is a valid STAR*NET .lst file.', 'error');
+                }
+            };
+            
+            reader.onerror = () => showStatus('❌ Error reading file.', 'error');
+            reader.readAsText(file);
+        }
+
+        function updateDashboard(data) {
+            elements.statsSection.classList.remove('hidden');
+            elements.networkSection.classList.remove('hidden');
+            elements.blunderSection.classList.remove('hidden');
+
+            const chiStatus = data.summary.chiSquareStatus;
+            elements.statChiSquare.innerHTML = `<span class="pill ${chiStatus === 'Pass' ? 'pass' : 'fail'}">${chiStatus}</span>`;
+            
+            const errFactor = data.summary.errorFactor || 0;
+            elements.statErrorFactor.innerHTML = `<span style="color: ${errFactor > 1.1 ? '#e74c3c' : 'var(--text)'}">${errFactor.toFixed(3)}</span>`;
+            
+            elements.statStations.textContent = data.summary.totalStations;
+            elements.statRedundancy.textContent = data.summary.redundantObs;
+
+            elements.blunderTableBody.innerHTML = '';
+            const topBlunders = parser.getTopBlunders(50);
+            
+            if (topBlunders.length === 0) {
+                elements.blunderTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center;">No observations found.</td></tr>`;
+                return;
+            }
+
+            topBlunders.forEach(obs => {
+                const tr = document.createElement('tr');
+                if (obs.isOutlier) {
+                    tr.className = 'qa-fail';
+                    tr.title = `Flagged Blunder: StdRes (${obs.stdRes.toFixed(1)}) exceeds 3.0 threshold.`;
+                }
+
+                tr.innerHTML = `
+                    <td>${obs.type}</td>
+                    <td><strong>${obs.from}</strong></td>
+                    <td><strong>${obs.to}</strong></td>
+                    <td class="numeric">${obs.value}</td>
+                    <td class="numeric">${obs.residual.toFixed(4)}</td>
+                    <td class="numeric">${obs.stdErr.toFixed(4)}</td>
+                    <td class="numeric" style="font-weight: bold;">${obs.stdRes.toFixed(1)}</td>
+                    <td>
+                        <button class="btn" style="padding: 2px 8px; font-size: 11px; font-family: monospace;" 
+                                onclick="copyFileLine(this, '${obs.fileLine}')">
+                            ${obs.fileLine} 📋
+                        </button>
+                    </td>
+                `;
+                elements.blunderTableBody.appendChild(tr);
+            });
+        }
+
+        function copyFileLine(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `${text} ✓`;
+                btn.style.color = '#2ecc71';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.color = '';
+                }, 1500);
+            });
+        }
+    </script>
+</body>
+</html>
